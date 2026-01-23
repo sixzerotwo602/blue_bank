@@ -47,8 +47,12 @@ export const RankingList: React.FC<Props> = ({ players, currentUserId, className
                           <div className={`font-bold ${isMe ? 'text-blue-300' : 'text-slate-300'}`}>
                              {player.nickname} {isMe && <span className="text-xs font-normal text-blue-400 bg-blue-400/10 px-1 rounded ml-1">나</span>}
                           </div>
-                          <div className="text-xs text-slate-500">
-                             현금: <MoneyDisplay amount={player.cash} showCurrency={false} />
+                          <div className="text-xs text-slate-500 flex gap-2">
+                             <span>현금: <MoneyDisplay amount={player.cash} showCurrency={false} /></span>
+                             {/* T014: Asset Counts */}
+                             <span className="text-slate-600">|</span>
+                             <span title="토지">🏞️ {player.assets?.filter(a => a.type === 'LAND').length || 0}</span>
+                             <span title="건물">🏢 {player.assets?.filter(a => a.type === 'BUILDING').length || 0}</span>
                           </div>
                        </div>
                     </div>

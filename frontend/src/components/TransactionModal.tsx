@@ -4,7 +4,7 @@ import type { Player, TransactionType } from '@blue-banker/shared';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (type: TransactionType, amount: number, toId?: string) => void;
+  onSubmit: (type: TransactionType, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING') => void;
   players: Player[];
   initialType: TransactionType;
   currentUserId?: string;
@@ -21,12 +21,14 @@ export const TransactionModal: React.FC<Props> = ({
   const [type, setType] = useState<TransactionType>(initialType);
   const [amount, setAmount] = useState('');
   const [toId, setToId] = useState('');
+  const [assetType, setAssetType] = useState<'LAND' | 'BUILDING'>('LAND'); // For Phase 4
 
   useEffect(() => {
     if (isOpen) {
         setType(initialType);
         setAmount('');
         setToId('');
+        setAssetType('LAND');
     }
   }, [isOpen, initialType]);
 
@@ -34,7 +36,6 @@ export const TransactionModal: React.FC<Props> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Remove non-digit chars
     const cleanAmount = parseInt(amount.replace(/[^0-9]/g, ''), 10);
     
     if (!cleanAmount || cleanAmount <= 0) {
@@ -47,20 +48,34 @@ export const TransactionModal: React.FC<Props> = ({
         return;
     }
 
-    onSubmit(type, cleanAmount, toId);
+    // Pass assetType if BUY_ASSET (Phase 4 preparation)
+    onSubmit(type, cleanAmount, toId, type === 'BUY_ASSET' ? assetType : undefined);
   };
 
   const formatInput = (val: string) => {
+    // Check if it's a negative operation happening via buttons, but input logic usually handles "value" string.
+    // If user types manually, handle digits.
     const num = val.replace(/[^0-9]/g, '');
     if (!num) return '';
     return parseInt(num, 10).toLocaleString('ko-KR');
   };
 
+  const adjustAmount = (diff: number) => {
+      const current = parseInt(amount.replace(/[^0-9]/g, '') || '0', 10);
+      const next = current + diff;
+      if (next < 0) {
+          setAmount('0');
+      } else {
+          setAmount(next.toLocaleString('ko-KR'));
+      }
+  };
+
+
   const renderTitle = () => {
     switch(type) {
         case 'TRANSFER': return '송금하기';
-        case 'BUY_ASSET': return '자산/비용';
-        case 'PAY_COST': return '자산/비용';
+        case 'BUY_ASSET': return '토지/건물/비용지불';
+        case 'PAY_COST': return '비용 지불';
         case 'DONATE': return '복지기금 기부';
         default: return '거래';
     }
@@ -75,7 +90,7 @@ export const TransactionModal: React.FC<Props> = ({
         onClick={onClose}
       />
       
-      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-slide-up sm:animate-scale-in">
+      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up sm:animate-scale-in">
         <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
            <h3 className="font-bold text-lg text-white">{renderTitle()}</h3>
            <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
@@ -84,29 +99,59 @@ export const TransactionModal: React.FC<Props> = ({
         <form onSubmit={handleSubmit} className="p-5 space-y-6">
            {/* Type Selector for Asset/Cost */}
            {(type === 'BUY_ASSET' || type === 'PAY_COST') && (
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-800 rounded-lg">
-                 <button
-                   type="button"
-                   onClick={() => setType('BUY_ASSET')}
-                   className={`py-2 text-sm font-semibold rounded-md transition-all ${
-                     type === 'BUY_ASSET' 
-                     ? 'bg-emerald-600 text-white shadow-lg' 
-                     : 'text-slate-400 hover:text-white'
-                   }`}
-                 >
-                   자산 매입
-                 </button>
-                 <button
-                   type="button"
-                   onClick={() => setType('PAY_COST')}
-                   className={`py-2 text-sm font-semibold rounded-md transition-all ${
-                     type === 'PAY_COST' 
-                     ? 'bg-red-600 text-white shadow-lg' 
-                     : 'text-slate-400 hover:text-white'
-                   }`}
-                 >
-                   비용 지불
-                 </button>
+              <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-800 rounded-lg">
+                     <button
+                       type="button"
+                       onClick={() => setType('BUY_ASSET')}
+                       className={`py-2 text-sm font-semibold rounded-md transition-all ${
+                         type === 'BUY_ASSET' 
+                         ? 'bg-emerald-600 text-white shadow-lg' 
+                         : 'text-slate-400 hover:text-white'
+                       }`}
+                     >
+                       토지 매입
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => setType('PAY_COST')}
+                       className={`py-2 text-sm font-semibold rounded-md transition-all ${
+                         type === 'PAY_COST' 
+                         ? 'bg-red-600 text-white shadow-lg' 
+                         : 'text-slate-400 hover:text-white'
+                       }`}
+                     >
+                       비용 지불
+                     </button>
+                  </div>
+
+                  {/* Asset Sub-selector */}
+                  {type === 'BUY_ASSET' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setAssetType('LAND')}
+                            className={`py-2 text-sm font-semibold rounded-lg border transition-all ${
+                                assetType === 'LAND'
+                                ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                                : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'
+                            }`}
+                        >
+                            🏞️ 토지
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAssetType('BUILDING')}
+                            className={`py-2 text-sm font-semibold rounded-lg border transition-all ${
+                                assetType === 'BUILDING'
+                                ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                                : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'
+                            }`}
+                        >
+                            🏢 건물
+                        </button>
+                      </div>
+                  )}
               </div>
            )}
 
@@ -154,20 +199,35 @@ export const TransactionModal: React.FC<Props> = ({
              </div>
              
              {/* Quick Amounts */}
-             <div className="flex gap-2 justify-end">
-                {[10000, 50000, 100000].map(val => (
-                   <button
-                     key={val}
-                     type="button"
-                     onClick={() => {
-                        const current = parseInt(amount.replace(/[^0-9]/g, '') || '0', 10);
-                        setAmount((current + val).toLocaleString('ko-KR'));
-                     }}
-                     className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-full text-xs text-slate-300 transition-colors"
-                   >
-                     +{val/10000}만
-                   </button>
-                ))}
+             <div className="flex gap-1.5 justify-center overflow-x-auto pb-2 scrollbar-hide">
+                {/* Special 150k button for DONATE */}
+                {type === 'DONATE' && (
+                    <button
+                        type="button"
+                        onClick={() => adjustAmount(150000)}
+                        className="flex-shrink-0 px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded-full text-xs text-white transition-colors whitespace-nowrap"
+                    >
+                        +15만
+                    </button>
+                )}
+                
+                {[100000, 50000, 10000, -10000, -50000, -100000].map(val => {
+                   const isNegative = val < 0;
+                   return (
+                       <button
+                         key={val}
+                         type="button"
+                         onClick={() => adjustAmount(val)}
+                         className={`flex-shrink-0 px-3 py-1 rounded-full text-xs transition-colors whitespace-nowrap ${
+                            isNegative 
+                             ? 'bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-500/20' 
+                             : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                         }`}
+                       >
+                         {isNegative ? '' : '+'}{val/10000}만
+                       </button>
+                   );
+                })}
              </div>
            </div>
 

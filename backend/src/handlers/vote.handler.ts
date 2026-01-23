@@ -16,12 +16,19 @@ export const registerVoteHandlers = (
      return null;
   };
 
-  socket.on('vote:request_fund', (amount: number) => {
+  socket.on('vote:request_fund', (_amount: number) => {
     try {
         const roomId = getRoomId();
         if (!roomId) throw new Error('Room not found');
 
-        const vote = voteService.createVote(roomId, socket.id, amount);
+        // T015: Use full amount
+        const room = store.rooms.get(roomId);
+        if (!room) throw new Error('Room not found');
+        
+        const fullAmount = room.welfareFund;
+        if (fullAmount <= 0) throw new Error('복지기금이 없습니다.');
+
+        const vote = voteService.createVote(roomId, socket.id, fullAmount);
         
         io.to(roomId).emit('vote:started', vote);
         io.to(roomId).emit('vote:updated', vote); // Initial state

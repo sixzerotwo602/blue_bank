@@ -6,6 +6,7 @@ import { MoneyDisplay } from '../components/MoneyDisplay';
 import { TransactionModal } from '../components/TransactionModal';
 import { VotePopup } from '../components/VotePopup';
 import { RankingList } from '../components/RankingList';
+import { ConfirmModal } from '../components/ConfirmModal';
 import type { TransactionType } from '@blue-banker/shared';
 
 export const Dashboard: React.FC = () => {
@@ -14,6 +15,23 @@ export const Dashboard: React.FC = () => {
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
+
+  // Confirmation Modal State
+  const [confirmState, setConfirmState] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => {},
+  });
+
+  const closeConfirm = () => {
+      setConfirmState(prev => ({ ...prev, isOpen: false }));
+  };
 
   if (!room) return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
@@ -29,20 +47,27 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleSalary = () => {
-      if(confirm('월급을 받으시겠습니까? (20만원)')) {
-          requestTransaction('SALARY', 200000);
-      }
+      setConfirmState({
+          isOpen: true,
+          title: '월급 받기',
+          message: '월급을 받으시겠습니까? (20만원)',
+          onConfirm: () => {
+              requestTransaction('SALARY', 200000);
+              closeConfirm();
+          }
+      });
   };
 
   const handleRequestFund = () => {
-      const input = prompt('수령할 금액을 입력해주세요:');
-      if(!input) return;
-      const cleanAmount = parseInt(input.replace(/[^0-9]/g, ''), 10);
-      if (cleanAmount > 0) {
-          requestFund(cleanAmount);
-      } else {
-          alert('올바른 금액을 입력해주세요.');
-      }
+      setConfirmState({
+          isOpen: true,
+          title: '복지기금 수령',
+          message: '복지기금 전액을 수령하시겠습니까?\n(투표 필요)',
+          onConfirm: () => {
+              requestFund(0);
+              closeConfirm();
+          }
+      });
   };
 
   return (
@@ -82,7 +107,7 @@ export const Dashboard: React.FC = () => {
                 className="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-2xl font-bold shadow-lg shadow-emerald-900/20 active:bg-emerald-700 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 h-32"
              >
                 <div className="text-2xl">🏠</div>
-                <div className="text-emerald-100">자산/비용</div>
+                <div className="text-emerald-100">토지/건물/비용지불</div>
              </button>
              <button 
                 onClick={() => openModal('DONATE')}
@@ -131,12 +156,25 @@ export const Dashboard: React.FC = () => {
        <TransactionModal 
          isOpen={modalOpen}
          onClose={() => setModalOpen(false)}
-         onSubmit={(type, amount, toId) => requestTransaction(type, amount, toId)}
+         onSubmit={async (type, amount, toId, assetType) => {
+             const success = await requestTransaction(type, amount, toId, assetType);
+             if (success) {
+                 setModalOpen(false);
+             }
+         }}
          players={room.players}
          initialType={txType}
          currentUserId={socket?.id}
        />
        
+       <ConfirmModal 
+         isOpen={confirmState.isOpen}
+         title={confirmState.title}
+         message={confirmState.message}
+         onConfirm={confirmState.onConfirm}
+         onCancel={closeConfirm}
+       />
+
        {activeVote && (
          <VotePopup 
            vote={activeVote}

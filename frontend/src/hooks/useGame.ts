@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from './useSocket';
 import type { Room, Vote } from '@blue-banker/shared';
@@ -15,6 +15,8 @@ export const useGame = (roomId?: string) => {
   // Sound effects
   const [playSuccess] = useSound('/sounds/success.mp3');
   const [playError] = useSound('/sounds/error.mp3'); 
+
+  const loadingToastId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!socket) return;
@@ -37,6 +39,10 @@ export const useGame = (roomId?: string) => {
     };
     
     const onVoteStarted = (vote: Vote) => {
+        if (loadingToastId.current) {
+            toast.dismiss(loadingToastId.current);
+            loadingToastId.current = null;
+        }
         setActiveVote(vote);
         toast('새로운 투표가 시작되었습니다.', { icon: '🗳️' });
     };
@@ -98,30 +104,38 @@ export const useGame = (roomId?: string) => {
     });
   }, [socket, navigate]);
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback((initialCash: number) => {
     if (!socket) return;
-    socket.emit('game:start');
+    socket.emit('game:start', initialCash);
     toast('게임 시작 요청!', { icon: '🎮' });
   }, [socket]);
 
-  const requestTransaction = useCallback((type: string, amount: number, toId?: string) => {
-    if (!socket) return;
-    // @ts-ignore Shared type update might not be reflected in frontend dev server yet without restart
-    socket.emit('tx:request', { type, amount, toId }, (res: any) => {
-        if (!res.success) {
-            toast.error(res.error || '거래 실패');
-            playError();
-        } else {
-            toast.success('거래 성공!');
-            playSuccess();
+  const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING') => {
+    return new Promise<boolean>((resolve) => {
+        if (!socket) {
+            resolve(false);
+            return;
         }
+        // @ts-ignore Shared type update might not be reflected in frontend dev server yet without restart
+        socket.emit('tx:request', { type, amount, toId, assetType }, (res: any) => {
+            if (!res.success) {
+                toast.error(res.error || '거래 실패');
+                playError();
+                resolve(false);
+            } else {
+                toast.success('거래 성공!');
+                playSuccess();
+                resolve(true);
+            }
+        });
     });
   }, [socket, playSuccess, playError]);
 
   const requestFund = useCallback((amount: number) => {
       if(!socket) return;
       socket.emit('vote:request_fund', amount);
-      toast.loading('투표 요청 중...');
+      const tid = toast.loading('투표 요청 중...');
+      loadingToastId.current = tid;
   }, [socket]);
 
   const castVote = useCallback((voteId: string, approve: boolean) => {

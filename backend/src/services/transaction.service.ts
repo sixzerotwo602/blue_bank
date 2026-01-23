@@ -10,6 +10,7 @@ export class TransactionService {
       type: TransactionType;
       amount: number;
       toId?: string;
+      assetType?: 'LAND' | 'BUILDING';
     }
   ): Transaction {
     const room = store.rooms.get(roomId);
@@ -39,13 +40,29 @@ export class TransactionService {
         break;
       }
 
-      case 'BUY_ASSET':
+      case 'BUY_ASSET': {
         if (player.cash < payload.amount) throw new Error('Insufficient funds');
+        const type = payload.assetType || 'LAND';
+        
+        // Generate Name (T011)
+        const count = player.assets.filter(a => a.type === type).length + 1;
+        const nameType = type === 'LAND' ? '토지' : '건물';
+        const name = `${nameType} #${count}`;
+
         player.cash -= payload.amount;
         player.assetValue += payload.amount;
+        player.assets.push({
+            id: randomUUID(),
+            type,
+            name,
+            value: payload.amount,
+            createdAt: Date.now()
+        });
+
         fromId = player.id;
         toId = 'BANK';
         break;
+      }
 
       case 'PAY_COST':
         if (player.cash < payload.amount) throw new Error('Insufficient funds');

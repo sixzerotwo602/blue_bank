@@ -21,6 +21,7 @@ export class RoomService {
       nickname,
       cash: 0, // Initial cash? Configurable? Rules say 0 or start amount
       assetValue: 0,
+      assets: [],
       roomId,
       isReady: false,
       isHost: true,
@@ -68,6 +69,7 @@ export class RoomService {
       nickname,
       cash: 0, // Rules?
       assetValue: 0,
+      assets: [],
       roomId,
       isReady: false,
       isHost: false,

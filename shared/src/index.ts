@@ -1,9 +1,18 @@
 
+export interface Asset {
+  id: string;
+  type: 'LAND' | 'BUILDING';
+  name?: string;
+  value: number;
+  createdAt: number;
+}
+
 export interface Player {
   id: string; // GUID or Socket ID
   nickname: string;
   cash: number;
   assetValue: number;
+  assets: Asset[]; // [NEW] List of owned assets
   roomId: string; // Current Room ID
   isReady: boolean;
   isHost: boolean;
@@ -60,8 +69,13 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   'room:create': (nickname: string, callback: (response: { roomId: string }) => void) => void;
   'room:join': (roomId: string, nickname: string, callback: (response: { success: boolean, message?: string }) => void) => void;
-  'game:start': () => void;
-  'tx:request': (tx: Omit<Transaction, 'id' | 'timestamp'>, callback?: (response: { success: boolean, txId?: string, error?: string }) => void) => void;
+  'game:start': (initialCash: number) => void;
+  'tx:request': (tx: {
+      type: TransactionType;
+      amount: number;
+      toId?: string;
+      assetType?: 'LAND' | 'BUILDING';
+  }, callback?: (response: { success: boolean, txId?: string, error?: string }) => void) => void;
   'vote:request_fund': (amount: number) => void;
   'vote:cast': (voteId: string, approve: boolean) => void;
 }
