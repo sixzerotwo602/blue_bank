@@ -1,71 +1,24 @@
-name: Deploy to Self-Hosted LXC
+# 1. 빌드 (러너의 임시 폴더에서 진행)
+- name: Install Dependencies & Build
+  run: |
+    echo "Cleaning previous installs to fix architecture mismatch..."
+    # 윈도우/맥에서 만든 lock파일과 충돌하지 않도록 삭제 후 클린 설치
+    rm -rf node_modules package-lock.json
+    rm -rf backend/node_modules backend/package-lock.json
+    rm -rf frontend/node_modules frontend/package-lock.json
+    rm -rf shared/node_modules shared/package-lock.json
 
-on:
-  push:
-    branches: ['master'] # master 브랜치에 푸시하면 발동
+    echo "Installing dependencies (Root)..."
+    # 루트에서 한 번만 설치하면 워크스페이스 설정에 따라 하위 패키지도 연결됩니다.
+    npm install
 
-jobs:
-  deploy:
-    runs-on: self-hosted # ⭐️ 방금 설치한 서버에서 실행하라는 뜻!
+    echo "Building Shared..."
+    # 하위 폴더에서 또 npm install을 하면 꼬일 수 있으니 빌드 명령어만 실행합니다.
+    cd shared && npm run build && cd ..
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    echo "Building Backend..."
+    cd backend && npm run build && cd ..
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-
-      # 1. 빌드 (러너의 임시 폴더에서 진행)
-      - name: Install Dependencies & Build
-        run: |
-          echo "Installing dependencies..."
-          npm install
-
-          echo "Building Shared..."
-          cd shared && npm install && npm run build && cd ..
-
-          echo "Building Backend..."
-          cd backend && npm install && npm run build && cd ..
-
-          echo "Building Frontend..."
-          cd frontend && npm install && npm run build && cd ..
-
-      # 2. 운영 폴더로 배포 (rsync 사용)
-      - name: Deploy to App Directory
-        run: |
-          echo "Deploying to ~/apps/blue_banker..."
-          mkdir -p ~/apps/blue_banker
-
-          # 빌드된 파일과 필요한 파일만 운영 폴더로 동기화 (.git, node_modules 제외)
-          rsync -av --delete \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude 'backend/node_modules' \
-            --exclude 'frontend/node_modules' \
-            --exclude 'shared/node_modules' \
-            ./ ~/apps/blue_banker/
-
-      # 3. 운영 폴더에서 프로덕션 의존성 설치
-      - name: Install Production Deps
-        run: |
-          cd ~/apps/blue_banker
-          npm install --omit=dev
-          cd backend && npm install --omit=dev
-
-      # 4. .env 파일 생성 (GitHub Secrets 사용)
-      - name: Create .env file
-        env:
-          DOTENV_CONTENT: ${{ secrets.DOTENV }}
-        run: |
-          echo "$DOTENV_CONTENT" > ~/apps/blue_banker/backend/.env
-          chmod 600 ~/apps/blue_banker/backend/.env
-
-      # 5. PM2 재시작 (Zero Downtime)
-      - name: Reload PM2
-        run: |
-          cd ~/apps/blue_banker
-          # ecosystem.config.js가 있다면 그것을 사용
-          pm2 startOrReload ecosystem.config.js --update-env
-          pm2 save
+    echo "Building Frontend..."
+    # 여기서 에러가 났었습니다. 이제 리눅스용 rollup이 설치되어 성공할 것입니다.
+    cd frontend && npm run build && cd ..
