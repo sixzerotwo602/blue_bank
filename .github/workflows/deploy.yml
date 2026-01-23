@@ -20,5 +20,5 @@
     cd backend && npm run build && cd ..
 
     echo "Building Frontend..."
-    # 여기서 에러가 났었습니다. 이제 리눅스용 rollup이 설치되어 성공할 것입니다.
+    # 이제 리눅스용 rollup이 설치되어 성공할 것입니다.
     cd frontend && npm run build && cd ..
