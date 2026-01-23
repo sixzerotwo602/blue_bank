@@ -1,8 +1,12 @@
-name: Deploy to Self-Hosted LXC
+name: Deploy Backend Only
 
 on:
   push:
     branches: ['master']
+    paths:
+      - 'backend/**'
+      - 'shared/**'
+      - '.github/workflows/**'
 
 jobs:
   deploy:
@@ -17,17 +21,16 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      # 1. 빌드 (러너의 임시 폴더에서 진행)
-      # 윈도우/맥에서 생성된 lock 파일과 리눅스 환경 충돌 방지를 위해 삭제 후 재설치
+      # 1. 빌드 (프론트엔드 제외)
       - name: Install Dependencies & Build
         run: |
-          echo "Cleaning previous installs to fix architecture mismatch..."
+          # 기존 모듈 삭제 (충돌 방지)
+          echo "Cleaning previous installs..."
           rm -rf node_modules package-lock.json
           rm -rf backend/node_modules backend/package-lock.json
-          rm -rf frontend/node_modules frontend/package-lock.json
           rm -rf shared/node_modules shared/package-lock.json
 
-          echo "Installing dependencies (Root)..."
+          echo "Installing dependencies..."
           npm install
 
           echo "Building Shared..."
@@ -36,32 +39,30 @@ jobs:
           echo "Building Backend..."
           cd backend && npm run build && cd ..
 
-          echo "Building Frontend..."
-          cd frontend && npm run build && cd ..
+          # ⭐️ 프론트엔드 빌드 단계 삭제됨
 
-      # 2. 운영 폴더로 배포 (rsync 사용)
+      # 2. 운영 폴더로 배포 (백엔드만)
       - name: Deploy to App Directory
         run: |
           echo "Deploying to ~/apps/blue_banker..."
           mkdir -p ~/apps/blue_banker
 
-          # 빌드된 파일과 필요한 파일만 운영 폴더로 동기화
           rsync -av --delete \
             --exclude '.git' \
             --exclude 'node_modules' \
             --exclude 'backend/node_modules' \
-            --exclude 'frontend/node_modules' \
             --exclude 'shared/node_modules' \
+            --exclude 'frontend' \
             ./ ~/apps/blue_banker/
 
-      # 3. 운영 폴더에서 프로덕션 의존성 설치
+      # 3. 의존성 설치
       - name: Install Production Deps
         run: |
           cd ~/apps/blue_banker
           npm install --omit=dev
           cd backend && npm install --omit=dev
 
-      # 4. .env 파일 생성 (GitHub Secrets 사용)
+      # 4. .env 생성
       - name: Create .env file
         env:
           DOTENV_CONTENT: ${{ secrets.DOTENV }}

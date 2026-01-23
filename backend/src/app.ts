@@ -19,7 +19,12 @@ export const io = new Server<
   ServerToClientEvents
 >(httpServer, {
   cors: {
-    origin: '*', // Allow all for MVP, restrict later
+    origin: [
+      "http://localhost:5173",
+      "https://blue-banker.pages.dev",
+      "https://*.pages.dev"
+    ],
+    credentials: true,
     methods: ['GET', 'POST'],
   },
 });
