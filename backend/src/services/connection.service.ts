@@ -210,6 +210,11 @@ export const connectionService = {
     // First player in the list becomes new host
     const newHost = onlinePlayers[0];
 
+    if (!newHost) {
+        room.pendingHostMigration = false;
+        return false;
+    }
+
     // Update old host
     const oldHost = room.players.find(p => p.id === oldHostId);
     if (oldHost) {

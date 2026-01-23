@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents, Transaction } from '@blue-banker/shared';
+import type { ClientToServerEvents, ServerToClientEvents, TransactionType } from '@blue-banker/shared';
 import { transactionService } from '../services/transaction.service.js';
 import { store } from '../models/store.js';
 
@@ -16,7 +16,7 @@ export const registerTransactionHandlers = (
      return null;
   };
 
-  socket.on('tx:request', (payload: Omit<Transaction, 'id' | 'timestamp'>, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
+  socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING' }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
     try {
         const roomId = getRoomId();
         if (!roomId) {
