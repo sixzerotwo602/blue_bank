@@ -1,0 +1,9 @@
+{
+  "name": "blue-marble-bank-monorepo",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ]
+}
