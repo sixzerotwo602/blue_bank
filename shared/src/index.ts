@@ -55,10 +55,24 @@ export interface Vote {
   expiresAt: number;
 }
 
+export interface Ranking {
+  id: string;
+  nickname: string;
+  cash: number;
+  assetValue: number;
+  totalAssets: number;
+  rank: number;
+}
+
+export interface GameEndedPayload {
+  rankings: Ranking[];
+}
+
 // Socket Events
 export interface ServerToClientEvents {
   'room:sync': (room: Room) => void;
   'game:started': () => void;
+  'game:ended': (payload: GameEndedPayload) => void;
   'tx:processed': (tx: Transaction) => void;
   'vote:started': (vote: Vote) => void;
   'vote:updated': (vote: Vote) => void;
@@ -69,7 +83,9 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   'room:create': (nickname: string, callback: (response: { roomId: string }) => void) => void;
   'room:join': (roomId: string, nickname: string, callback: (response: { success: boolean, message?: string }) => void) => void;
+  'room:get': (roomId: string, callback: (response: { room?: Room, error?: string }) => void) => void;
   'game:start': (initialCash: number) => void;
+  'game:end': (roomId: string) => void;
   'tx:request': (tx: {
       type: TransactionType;
       amount: number;

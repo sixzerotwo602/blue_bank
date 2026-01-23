@@ -10,11 +10,13 @@ export const useGame = (roomId?: string) => {
   const navigate = useNavigate();
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rankings, setRankings] = useState<any[] | null>(null);
   const [activeVote, setActiveVote] = useState<Vote | null>(null);
 
   // Sound effects
   const [playSuccess] = useSound('/sounds/success.mp3');
   const [playError] = useSound('/sounds/error.mp3'); 
+  const [playFanfare] = useSound('/sounds/fanfare.mp3'); // Assuming we add this later or use success
 
   const loadingToastId = useRef<string | null>(null);
 
@@ -36,6 +38,12 @@ export const useGame = (roomId?: string) => {
 
     const onGameStarted = () => {
        if (roomId) navigate(`/game/${roomId}`);
+    };
+
+    const onGameEnded = (payload: { rankings: any[] }) => {
+        setRankings(payload.rankings);
+        toast('게임이 종료되었습니다!', { icon: '🏁' });
+        // playFanfare(); 
     };
     
     const onVoteStarted = (vote: Vote) => {
@@ -63,18 +71,45 @@ export const useGame = (roomId?: string) => {
         }, 3000);
     };
 
+    const onError = (message: string) => {
+        // Dismiss loading toast if any
+        if (loadingToastId.current) {
+            toast.dismiss(loadingToastId.current);
+            loadingToastId.current = null;
+        }
+        toast.error(message);
+        playError();
+    };
+
     socket.on('room:sync', onSync);
     socket.on('game:started', onGameStarted);
+    socket.on('game:ended', onGameEnded);
     socket.on('vote:started', onVoteStarted);
     socket.on('vote:updated', onVoteUpdated);
     socket.on('vote:ended', onVoteEnded);
+    socket.on('error', onError);
+
+    // Initial Fetch if room is missing (e.g. refresh or quick nav)
+    if (roomId && !room) {
+        // @ts-ignore Shared type update might be delayed in IDE/dev server
+        socket.emit('room:get', roomId, (res: any) => {
+            if (res.room) {
+                setRoom(res.room);
+            } else if (res.error) {
+                setError(res.error);
+                toast.error(res.error);
+            }
+        });
+    }
 
     return () => {
       socket.off('room:sync', onSync);
       socket.off('game:started', onGameStarted);
+      socket.off('game:ended', onGameEnded);
       socket.off('vote:started', onVoteStarted);
       socket.off('vote:updated', onVoteUpdated);
       socket.off('vote:ended', onVoteEnded);
+      socket.off('error', onError);
     };
   }, [socket, roomId, navigate, playSuccess, playError]);
 
@@ -109,6 +144,11 @@ export const useGame = (roomId?: string) => {
     socket.emit('game:start', initialCash);
     toast('게임 시작 요청!', { icon: '🎮' });
   }, [socket]);
+
+  const endGame = useCallback(() => {
+    if (!socket || !roomId) return;
+    socket.emit('game:end', roomId);
+  }, [socket, roomId]);
 
   const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING') => {
     return new Promise<boolean>((resolve) => {
@@ -149,9 +189,11 @@ export const useGame = (roomId?: string) => {
     error,
     connected,
     activeVote,
+    rankings,
     createRoom,
     joinRoom,
     startGame,
+    endGame,
     requestTransaction,
     requestFund,
     castVote

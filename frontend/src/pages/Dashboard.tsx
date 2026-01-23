@@ -9,9 +9,11 @@ import { RankingList } from '../components/RankingList';
 import { ConfirmModal } from '../components/ConfirmModal';
 import type { TransactionType } from '@blue-banker/shared';
 
+import { SettlementView } from '../components/SettlementView';
+
 export const Dashboard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { room, requestTransaction, activeVote, castVote, requestFund } = useGame(roomId);
+  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, endGame } = useGame(roomId);
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
@@ -40,6 +42,7 @@ export const Dashboard: React.FC = () => {
   );
 
   const me = room.players.find(p => p.id === socket?.id);
+  const isHost = me?.isHost;
   
   const openModal = (type: TransactionType) => {
       setTxType(type);
@@ -70,10 +73,27 @@ export const Dashboard: React.FC = () => {
       });
   };
 
+  const handleGameEnd = () => {
+      setConfirmState({
+          isOpen: true,
+          title: '게임 종료',
+          message: '정말 게임을 종료하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+          onConfirm: () => {
+              endGame();
+              closeConfirm();
+          }
+      });
+  };
+
+  const handleGoHome = () => {
+      // Disconnect socket logic handled inside useSocket or manual simple redirect
+      window.location.href = '/'; 
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-20">
+    <div className="min-h-screen bg-slate-950 text-white pb-24">
        <nav className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-10">
-          <div className="font-bold text-lg bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Blue Marble</div>
+          <div className="font-bold text-lg bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Blue Bank</div>
           <div className="bg-slate-800 px-3 py-1 rounded-full text-xs font-mono text-slate-400">#{roomId}</div>
        </nav>
 
@@ -130,7 +150,7 @@ export const Dashboard: React.FC = () => {
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400 text-xl">🏦</div>
                   <div>
-                      <h3 className="text-xs text-purple-300 font-bold uppercase tracking-wider">Public Welfare Fund</h3>
+                      <h3 className="text-xs text-purple-300 font-bold uppercase tracking-wider">사회복지기금</h3>
                       <div className="text-xl font-bold text-white">
                          <MoneyDisplay amount={room.welfareFund} />
                       </div>
@@ -146,6 +166,19 @@ export const Dashboard: React.FC = () => {
 
           {/* Ranking List */}
           <RankingList players={room.players} currentUserId={socket?.id} />
+
+          {/* Host Actions: Game End */}
+          {isHost && (
+              <div className="pt-8 pb-4">
+                  <button
+                    onClick={handleGameEnd}
+                    className="w-full bg-red-950/30 text-red-500 border border-red-900/50 p-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-red-900/20 hover:text-red-400 transition-colors"
+                  >
+                      <span>🚫</span>
+                      게임 종료 / 최종 정산
+                  </button>
+              </div>
+          )}
        </main>
 
        {/* Footer / Coming Soon */}
@@ -183,6 +216,9 @@ export const Dashboard: React.FC = () => {
            onCastVote={castVote}
          />
        )}
+
+       {/* Settlement Overlay */}
+       <SettlementView rankings={rankings} onGoHome={handleGoHome} />
     </div>
   );
 };

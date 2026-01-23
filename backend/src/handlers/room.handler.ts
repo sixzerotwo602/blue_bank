@@ -34,4 +34,13 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
       callback({ success: false, message: 'Server error' });
     }
   });
+
+  socket.on('room:get', (roomId, callback) => {
+      const room = roomService.getRoom(roomId);
+      if (room) {
+          callback({ room });
+      } else {
+          callback({ error: 'Room not found' });
+      }
+  });
 };

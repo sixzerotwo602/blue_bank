@@ -21,7 +21,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     // Determine URL based on environment if needed, defaulting to localhost:3000
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const socketUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
     
     // Explicitly casting to AppSocket type
     const newSocket = io(socketUrl, {
