@@ -31,13 +31,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [reconnectFailed, setReconnectFailed] = useState(false);
 
   useEffect(() => {
-    // Determine URL based on environment if needed, defaulting to localhost:3000
-    const socketUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000`;
+    // Use centralized BACKEND_URL logic
+    const socketUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
     
     // Configure auto-reconnection (T053)
     const newSocket = io(socketUrl, {
       transports: ['websocket'],
       autoConnect: true,
+      withCredentials: true, // Consistency with useSocket.ts
       // Reconnection settings (T053)
       reconnection: true,
       reconnectionAttempts: 5, // Max 5 attempts
