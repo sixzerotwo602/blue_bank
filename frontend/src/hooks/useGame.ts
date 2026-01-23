@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from './useSocket';
-import type { Room, Vote } from '@blue-banker/shared';
+import type { Room, Vote, ConnectionStatusPayload, HostMigratingPayload, HostMigratedPayload, PlayerKickedPayload } from '@blue-banker/shared';
 import toast from 'react-hot-toast';
 import useSound from 'use-sound';
 
@@ -16,7 +16,6 @@ export const useGame = (roomId?: string) => {
   // Sound effects
   const [playSuccess] = useSound('/sounds/success.mp3');
   const [playError] = useSound('/sounds/error.mp3'); 
-  const [playFanfare] = useSound('/sounds/fanfare.mp3'); // Assuming we add this later or use success
 
   const loadingToastId = useRef<string | null>(null);
 
@@ -43,7 +42,6 @@ export const useGame = (roomId?: string) => {
     const onGameEnded = (payload: { rankings: any[] }) => {
         setRankings(payload.rankings);
         toast('게임이 종료되었습니다!', { icon: '🏁' });
-        // playFanfare(); 
     };
     
     const onVoteStarted = (vote: Vote) => {
@@ -81,6 +79,71 @@ export const useGame = (roomId?: string) => {
         playError();
     };
 
+    // Connection event handlers (T020, T031-T032, T040-T042, T050)
+    const onConnectionStatus = (payload: ConnectionStatusPayload) => {
+        setRoom(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                players: prev.players.map(p => 
+                    p.id === payload.playerId 
+                        ? { ...p, connectionStatus: payload.status }
+                        : p
+                )
+            };
+        });
+        
+        if (payload.status === 'OFFLINE') {
+            toast(`${payload.nickname}님의 연결이 끊겼습니다`, { icon: '🔌' });
+        }
+    };
+
+    const onPlayerRejoined = (payload: { playerId: string, nickname: string }) => {
+        toast.success(`${payload.nickname}님이 재접속했습니다`);
+    };
+
+    const onHostMigrating = (payload: HostMigratingPayload) => {
+        toast(`호스트 연결 끊김. ${payload.remainingSeconds}초 후 호스트가 변경됩니다.`, { 
+            icon: '⏳',
+            duration: 5000
+        });
+    };
+
+    const onHostMigrated = (payload: HostMigratedPayload) => {
+        setRoom(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                hostId: payload.newHostId,
+                pendingHostMigration: false,
+                players: prev.players.map(p => ({
+                    ...p,
+                    isHost: p.id === payload.newHostId
+                }))
+            };
+        });
+        toast.success(`${payload.newHostNickname}님이 새로운 호스트가 되었습니다`);
+    };
+
+    const onHostMigrationCancelled = (payload: { hostId: string, hostNickname: string }) => {
+        setRoom(prev => {
+            if (!prev) return prev;
+            return { ...prev, pendingHostMigration: false };
+        });
+        toast(`${payload.hostNickname}님이 복귀했습니다`, { icon: '👋' });
+    };
+
+    const onPlayerKicked = (payload: PlayerKickedPayload) => {
+        setRoom(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                players: prev.players.filter(p => p.id !== payload.playerId)
+            };
+        });
+        toast(`${payload.nickname}님이 퇴장되었습니다`, { icon: '🚪' });
+    };
+
     socket.on('room:sync', onSync);
     socket.on('game:started', onGameStarted);
     socket.on('game:ended', onGameEnded);
@@ -88,6 +151,13 @@ export const useGame = (roomId?: string) => {
     socket.on('vote:updated', onVoteUpdated);
     socket.on('vote:ended', onVoteEnded);
     socket.on('error', onError);
+    // Connection events
+    socket.on('connection:status', onConnectionStatus);
+    socket.on('player:rejoined', onPlayerRejoined);
+    socket.on('host:migrating', onHostMigrating);
+    socket.on('host:migrated', onHostMigrated);
+    socket.on('host:migration_cancelled', onHostMigrationCancelled);
+    socket.on('player:kicked', onPlayerKicked);
 
     // Initial Fetch if room is missing (e.g. refresh or quick nav)
     if (roomId && !room) {
@@ -110,13 +180,56 @@ export const useGame = (roomId?: string) => {
       socket.off('vote:updated', onVoteUpdated);
       socket.off('vote:ended', onVoteEnded);
       socket.off('error', onError);
+      socket.off('connection:status', onConnectionStatus);
+      socket.off('player:rejoined', onPlayerRejoined);
+      socket.off('host:migrating', onHostMigrating);
+      socket.off('host:migrated', onHostMigrated);
+      socket.off('host:migration_cancelled', onHostMigrationCancelled);
+      socket.off('player:kicked', onPlayerKicked);
     };
   }, [socket, roomId, navigate, playSuccess, playError]);
+
+  // Auto-rejoin on refresh/connect (T060)
+  const hasAttemptedRelogin = useRef(false);
+
+  useEffect(() => {
+    if (!socket || !connected || !roomId || hasAttemptedRelogin.current) return;
+
+    const storedNickname = localStorage.getItem(`blue-banker-nickname-${roomId}`);
+    if (storedNickname) {
+        hasAttemptedRelogin.current = true;
+        
+        // Try to join/rejoin
+        socket.emit('room:join', roomId, storedNickname, (res) => {
+            if (res.success) {
+                // If success, we are good.
+                // Could be a fresh join or a restore.
+                toast.success('접속되었습니다');
+            } else {
+                // If failed (e.g. "Nickname taken"), it might be because we are already connected (nav) 
+                // or someone else took it.
+                // For "Nickname taken", we usually don't need to alert if it's just a nav check.
+                // But if we are refreshing, we want to know.
+                // Given the complexities, maybe just log or silent?
+                if (res.message !== 'Nickname taken') {
+                     // Only show error if it's NOT "Nickname taken" (which implies we might already be in)
+                     // But wait, if we are 'spectating' (refresh), we are NOT in.
+                     // If existing player is OFFLINE, we want to reclaim.
+                     // Backend room.handler now handles "Game already started" -> Restore.
+                     // But "Nickname taken" (Lobby duplicate) is still an issue if we don't fix backend.
+                     // For MVP, if game started, this works.
+                     console.log('Auto-join result:', res);
+                }
+            }
+        });
+    }
+  }, [socket, connected, roomId]);
 
   const createRoom = useCallback((nickname: string) => {
     if (!socket) return;
     socket.emit('room:create', nickname, (res) => {
       if (res && res.roomId) {
+        localStorage.setItem(`blue-banker-nickname-${res.roomId}`, nickname);
         toast.success(`방 생성 완료: ${res.roomId}`);
         navigate(`/lobby/${res.roomId}`);
       } else {
@@ -130,6 +243,7 @@ export const useGame = (roomId?: string) => {
     if (!socket) return;
     socket.emit('room:join', targetRoomId, nickname, (res) => {
       if (res.success) {
+        localStorage.setItem(`blue-banker-nickname-${targetRoomId}`, nickname);
         toast.success(`${targetRoomId}번 방 입장!`);
         navigate(`/lobby/${targetRoomId}`);
       } else {
@@ -148,6 +262,8 @@ export const useGame = (roomId?: string) => {
   const endGame = useCallback(() => {
     if (!socket || !roomId) return;
     socket.emit('game:end', roomId);
+    // Clear stored nickname on game end? Maybe.
+    // localStorage.removeItem(`blue-banker-nickname-${roomId}`);
   }, [socket, roomId]);
 
   const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING') => {
@@ -184,6 +300,16 @@ export const useGame = (roomId?: string) => {
       toast.success('투표 완료');
   }, [socket]);
 
+  // Kick player function (T049)
+  const kickPlayer = useCallback((playerId: string) => {
+      if (!socket) return;
+      socket.emit('player:kick', playerId, (res) => {
+          if (!res.success) {
+              toast.error(res.message || '퇴장 처리 실패');
+          }
+      });
+  }, [socket]);
+
   return {
     room,
     error,
@@ -196,6 +322,9 @@ export const useGame = (roomId?: string) => {
     endGame,
     requestTransaction,
     requestFund,
-    castVote
+    castVote,
+    kickPlayer
   };
 };
+
+

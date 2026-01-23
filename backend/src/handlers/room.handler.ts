@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { roomService } from '../services/room.service.js';
+import { connectionService } from '../services/connection.service.js';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
 
 export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToClientEvents>, socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
@@ -19,7 +20,23 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
 
   socket.on('room:join', (roomId, nickname, callback) => {
     try {
-      const result = roomService.joinRoom(roomId, socket.id, nickname);
+      // 1. Try normal join
+      let result = roomService.joinRoom(roomId, socket.id, nickname);
+
+      // 2. If failed because game started, try reconnection
+      if (!result.success && result.message === 'Game already started') {
+        const restoredPlayer = connectionService.restoreSession(roomId, nickname, socket.id);
+        if (restoredPlayer) {
+          result = { success: true };
+          // Notify others about rejoin (optional, or just rely on sync)
+          io.to(roomId).emit('player:rejoined', {
+            playerId: restoredPlayer.id,
+            nickname: restoredPlayer.nickname
+          });
+        }
+      }
+
+      // 3. Handle success (either new join or reconnection)
       if (result.success) {
         socket.join(roomId);
         const room = roomService.getRoom(roomId);
@@ -29,7 +46,7 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
         }
       }
       callback(result);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
       callback({ success: false, message: 'Server error' });
     }
@@ -44,3 +61,4 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
       }
   });
 };
+

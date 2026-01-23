@@ -7,6 +7,33 @@ export interface Asset {
   createdAt: number;
 }
 
+// Connection Status Types (T001)
+export type ConnectionStatus = 'ONLINE' | 'OFFLINE' | 'RECONNECTING';
+
+// Connection Payload Types (T002-T004)
+export interface ConnectionStatusPayload {
+  playerId: string;
+  status: ConnectionStatus;
+  nickname: string;
+}
+
+export interface HostMigratingPayload {
+  disconnectedHostId: string;
+  remainingSeconds: number;
+}
+
+export interface HostMigratedPayload {
+  oldHostId: string;
+  newHostId: string;
+  newHostNickname: string;
+}
+
+export interface PlayerKickedPayload {
+  playerId: string;
+  nickname: string;
+}
+
+// Extended Player interface (T008)
 export interface Player {
   id: string; // GUID or Socket ID
   nickname: string;
@@ -17,6 +44,21 @@ export interface Player {
   isReady: boolean;
   isHost: boolean;
   connected: boolean;
+  connectionStatus: ConnectionStatus; // [NEW] Connection status
+  lastSeenAt: number; // [NEW] Last activity timestamp
+  disconnectedAt: number | null; // [NEW] Disconnect timestamp
+}
+
+// DisconnectedSession interface (T009)
+export interface DisconnectedSession {
+  nickname: string;
+  roomId: string;
+  cash: number;
+  assetValue: number;
+  assets: Asset[];
+  disconnectedAt: number;
+  expiresAt: number;
+  originalSocketId: string;
 }
 
 export type RoomStatus = 'LOBBY' | 'PLAYING' | 'ENDED';
@@ -28,6 +70,7 @@ export interface Room {
   welfareFund: number;
   hostId: string;
   createdAt: number; // timestamp
+  pendingHostMigration?: boolean; // [NEW] Host migration pending flag
 }
 
 export type TransactionType = 'TRANSFER' | 'BUY_ASSET' | 'PAY_COST' | 'DONATE' | 'SALARY' | 'WELFARE_RECEIVE';
@@ -68,7 +111,7 @@ export interface GameEndedPayload {
   rankings: Ranking[];
 }
 
-// Socket Events
+// Socket Events (T005-T006)
 export interface ServerToClientEvents {
   'room:sync': (room: Room) => void;
   'game:started': () => void;
@@ -78,6 +121,13 @@ export interface ServerToClientEvents {
   'vote:updated': (vote: Vote) => void;
   'vote:ended': (vote: Vote) => void;
   'error': (message: string) => void;
+  // Connection events (NEW)
+  'connection:status': (payload: ConnectionStatusPayload) => void;
+  'host:migrating': (payload: HostMigratingPayload) => void;
+  'host:migrated': (payload: HostMigratedPayload) => void;
+  'host:migration_cancelled': (payload: { hostId: string, hostNickname: string }) => void;
+  'player:kicked': (payload: PlayerKickedPayload) => void;
+  'player:rejoined': (payload: { playerId: string, nickname: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -94,4 +144,9 @@ export interface ClientToServerEvents {
   }, callback?: (response: { success: boolean, txId?: string, error?: string }) => void) => void;
   'vote:request_fund': (amount: number) => void;
   'vote:cast': (voteId: string, approve: boolean) => void;
+  // Connection events (NEW)
+  'connection:heartbeat': () => void;
+  'room:rejoin': (roomId: string, nickname: string, callback: (response: { success: boolean, message?: string }) => void) => void;
+  'player:kick': (playerId: string, callback: (response: { success: boolean, message?: string }) => void) => void;
 }
+

@@ -7,13 +7,14 @@ import { TransactionModal } from '../components/TransactionModal';
 import { VotePopup } from '../components/VotePopup';
 import { RankingList } from '../components/RankingList';
 import { ConfirmModal } from '../components/ConfirmModal';
+// ConnectionStatus and KickPlayerButton are now used in RankingList
 import type { TransactionType } from '@blue-banker/shared';
 
 import { SettlementView } from '../components/SettlementView';
 
 export const Dashboard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, endGame } = useGame(roomId);
+  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, endGame, kickPlayer } = useGame(roomId);
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
@@ -85,6 +86,22 @@ export const Dashboard: React.FC = () => {
       });
   };
 
+  // Kick player handler with confirmation (T052)
+  const handleKickPlayer = (playerId: string) => {
+      const player = room.players.find(p => p.id === playerId);
+      if (!player) return;
+      
+      setConfirmState({
+          isOpen: true,
+          title: '플레이어 강제 퇴장',
+          message: `${player.nickname}님을 강제 퇴장시키겠습니까?\n해당 플레이어의 모든 자산이 삭제됩니다.`,
+          onConfirm: () => {
+              kickPlayer(playerId);
+              closeConfirm();
+          }
+      });
+  };
+
   const handleGoHome = () => {
       // Disconnect socket logic handled inside useSocket or manual simple redirect
       window.location.href = '/'; 
@@ -93,7 +110,7 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-24">
        <nav className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-10">
-          <div className="font-bold text-lg bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Blue Bank</div>
+          <div className="font-bold text-lg bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Blue Banker</div>
           <div className="bg-slate-800 px-3 py-1 rounded-full text-xs font-mono text-slate-400">#{roomId}</div>
        </nav>
 
@@ -165,7 +182,12 @@ export const Dashboard: React.FC = () => {
           </section>
 
           {/* Ranking List */}
-          <RankingList players={room.players} currentUserId={socket?.id} />
+          <RankingList 
+            players={room.players} 
+            currentUserId={socket?.id} 
+            isHost={isHost}
+            onKick={handleKickPlayer}
+          />
 
           {/* Host Actions: Game End */}
           {isHost && (

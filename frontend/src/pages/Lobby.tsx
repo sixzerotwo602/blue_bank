@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useGame } from '../hooks/useGame';
 import { useSocket } from '../hooks/useSocket'; // Still need useSocket for socket.id check (or expose myId from useGame)
 import type { Player } from '@blue-banker/shared';
+import { ConnectionStatus } from '../components/ConnectionStatus';
 
 export const Lobby: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -35,12 +36,14 @@ export const Lobby: React.FC = () => {
                 {room.players.map((p: Player) => (
                     <li key={p.id} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg">
                         <span className="font-medium flex items-center gap-2">
+                            {/* Connection Status Indicator (T021) */}
+                            <ConnectionStatus status={p.connectionStatus || 'ONLINE'} />
                             {p.nickname}
                             {p.isHost && <span className="bg-yellow-500/20 text-yellow-300 text-xs px-2 py-0.5 rounded">HOST</span>}
                             {p.id === socket?.id && <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded">ME</span>}
                         </span>
-                        <span className={p.connected ? 'text-green-400 text-sm' : 'text-red-400 text-sm'}>
-                            {p.connected ? '대기 중' : '연결 끊김'}
+                        <span className={p.connectionStatus === 'ONLINE' || p.connected ? 'text-green-400 text-sm' : 'text-red-400 text-sm'}>
+                            {p.connectionStatus === 'ONLINE' || p.connected ? '대기 중' : p.connectionStatus === 'RECONNECTING' ? '재연결 중' : '연결 끊김'}
                         </span>
                     </li>
                 ))}

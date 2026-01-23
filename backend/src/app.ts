@@ -28,6 +28,8 @@ import { registerRoomHandlers } from './handlers/room.handler.js';
 import { registerGameHandlers } from './handlers/game.handler.js';
 import { registerTransactionHandlers } from './handlers/transaction.handler.js';
 import { registerVoteHandlers } from './handlers/vote.handler.js';
+import { registerConnectionHandlers } from './handlers/connection.handler.js';
+import { connectionService } from './services/connection.service.js';
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -36,10 +38,20 @@ io.on('connection', (socket) => {
   registerGameHandlers(io, socket);
   registerTransactionHandlers(io, socket);
   registerVoteHandlers(io, socket);
+  registerConnectionHandlers(io, socket);
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
 });
 
+// Session cleanup timer (T029) - runs every minute
+setInterval(() => {
+  const cleaned = connectionService.cleanupExpiredSessions();
+  if (cleaned > 0) {
+    console.log(`Cleaned up ${cleaned} expired sessions`);
+  }
+}, 60 * 1000);
+
 export default app;
+

@@ -1,4 +1,4 @@
-import type { Room, Transaction, Vote } from '@blue-banker/shared';
+import type { Room, Transaction, Vote, DisconnectedSession } from '@blue-banker/shared';
 
 class Store {
   public rooms: Map<string, Room> = new Map();
@@ -10,6 +10,8 @@ class Store {
   // User Story 2 says "View transaction history". Usually filtered by player or room.
   public transactions: Map<string, Transaction> = new Map(); 
   public votes: Map<string, Vote> = new Map();
+  // Disconnected sessions for reconnection (T013)
+  public disconnectedSessions: Map<string, DisconnectedSession> = new Map();
 
   constructor() {
     this.rooms = new Map();
@@ -19,7 +21,9 @@ class Store {
     this.rooms.clear();
     this.transactions.clear();
     this.votes.clear();
+    this.disconnectedSessions.clear();
   }
 }
 
 export const store = new Store();
+

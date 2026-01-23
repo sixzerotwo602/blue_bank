@@ -26,6 +26,9 @@ export class RoomService {
       isReady: false,
       isHost: true,
       connected: true,
+      connectionStatus: 'ONLINE', // (T018) Initialize connection status
+      lastSeenAt: Date.now(),      // (T018) Initialize last seen time
+      disconnectedAt: null,        // (T018) Initialize disconnect time
     };
 
     const room: Room = {
@@ -74,6 +77,9 @@ export class RoomService {
       isReady: false,
       isHost: false,
       connected: true,
+      connectionStatus: 'ONLINE', // (T018) Initialize connection status
+      lastSeenAt: Date.now(),      // (T018) Initialize last seen time
+      disconnectedAt: null,        // (T018) Initialize disconnect time
     };
 
     room.players.push(player);
@@ -86,3 +92,4 @@ export class RoomService {
 }
 
 export const roomService = new RoomService();
+

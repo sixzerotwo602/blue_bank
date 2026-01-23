@@ -5,10 +5,23 @@ import { SocketProvider } from './services/socketContext';
 import { Home } from './pages/Home';
 import { Lobby } from './pages/Lobby';
 import { Dashboard } from './pages/Dashboard';
+import { ReconnectOverlay } from './components/ReconnectOverlay';
+import { useSocket } from './hooks/useSocket';
 
-function App() {
+// Inner component to access socket context (T059)
+const AppContent = () => {
+  const { reconnecting, reconnectAttempt, reconnectFailed } = useSocket();
+
   return (
-    <SocketProvider>
+    <>
+      {(reconnecting || reconnectFailed) && (
+        <ReconnectOverlay
+          attempts={reconnectAttempt}
+          maxAttempts={5}
+          failed={reconnectFailed}
+          onRefresh={() => window.location.reload()}
+        />
+      )}
       <Toaster position="top-center" reverseOrder={false} />
       <BrowserRouter>
         <Routes>
@@ -18,8 +31,17 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+    </>
+  );
+};
+
+function App() {
+  return (
+    <SocketProvider>
+      <AppContent />
     </SocketProvider>
   );
 }
 
 export default App;
+

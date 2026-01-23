@@ -23,7 +23,7 @@ export const Home: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
       <div className="bg-white/10 backdrop-blur-lg border border-white/20 p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
         <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 mb-2">
-          Blue Bank
+          Blue Banker
         </h1>
         <p className="text-blue-200 mb-8">모바일 컴패니언 앱</p>
 

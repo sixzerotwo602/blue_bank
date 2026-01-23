@@ -1,14 +1,24 @@
 import React from 'react';
 import type { Player } from '@blue-banker/shared';
 import { MoneyDisplay } from './MoneyDisplay';
+import { ConnectionStatus } from './ConnectionStatus';
+import { KickPlayerButton } from './KickPlayerButton';
 
 interface Props {
   players: Player[];
   currentUserId?: string;
   className?: string;
+  isHost?: boolean;
+  onKick?: (playerId: string) => void;
 }
 
-export const RankingList: React.FC<Props> = ({ players, currentUserId, className = '' }) => {
+export const RankingList: React.FC<Props> = ({ 
+  players, 
+  currentUserId, 
+  className = '',
+  isHost = false,
+  onKick
+}) => {
   const sortedPlayers = [...players].sort((a, b) => {
     const totalA = a.cash + a.assetValue;
     const totalB = b.cash + b.assetValue;
@@ -43,6 +53,8 @@ export const RankingList: React.FC<Props> = ({ players, currentUserId, className
                        <div className={`font-bold w-6 text-center ${rankColor} text-lg`}>
                           {rankIcon || index + 1}
                        </div>
+                       {/* Connection Status Indicator (T022) */}
+                       <ConnectionStatus status={player.connectionStatus || 'ONLINE'} size="sm" />
                        <div>
                           <div className={`font-bold ${isMe ? 'text-blue-300' : 'text-slate-300'}`}>
                              {player.nickname} {isMe && <span className="text-xs font-normal text-blue-400 bg-blue-400/10 px-1 rounded ml-1">나</span>}
@@ -57,12 +69,22 @@ export const RankingList: React.FC<Props> = ({ players, currentUserId, className
                        </div>
                     </div>
                     
-                    <div className="text-right">
-                       <div className="font-bold text-slate-200">
-                          <MoneyDisplay amount={totalAsset} />
-                       </div>
-                       <div className="text-xs text-slate-500">
-                          총 자산
+                    <div className="flex items-center gap-2">
+                       {/* Kick Button for Host (T051) */}
+                       {isHost && onKick && !isMe && (
+                         <KickPlayerButton 
+                           player={player} 
+                           onKick={onKick} 
+                           isHost={isHost} 
+                         />
+                       )}
+                       <div className="text-right">
+                          <div className="font-bold text-slate-200">
+                             <MoneyDisplay amount={totalAsset} />
+                          </div>
+                          <div className="text-xs text-slate-500">
+                             총 자산
+                          </div>
                        </div>
                     </div>
                  </div>
@@ -72,3 +94,4 @@ export const RankingList: React.FC<Props> = ({ players, currentUserId, className
     </div>
   );
 };
+
