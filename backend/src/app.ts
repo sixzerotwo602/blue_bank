@@ -12,6 +12,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint for Cron-job.org
+app.get('/health', (req, res) => {
+  res.status(200).send('Server is awake!');
+});
+
 export const httpServer = createServer(app);
 
 export const io = new Server<
