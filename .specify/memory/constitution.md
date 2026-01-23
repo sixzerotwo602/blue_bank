@@ -1,50 +1,56 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- Sync Impact Report
+Version: 0.0.0 -> 1.0.0 (Initial Ratification)
+Added Principles:
+  - Simplicity & Efficiency (KISS, YAGNI, DRY)
+  - Structure & Design (SOLID, SoC)
+  - Collaboration & Intuitiveness (Boy Scout Rule, Principle of Least Astonishment)
+Templates Status:
+  - plan-template.md: ✅ Compatible (Dynamic Constitution Check)
+  - spec-template.md: ✅ Compatible
+  - tasks-template.md: ✅ Compatible
+Follow-up: None
+-->
+
+# Blue Banker Constitution
+
+<!-- Engineering Principles & Governance -->
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Simplicity & Efficiency
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+<!-- KISS, YAGNI, DRY -->
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+Maximal clarity and minimal waste.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+- **KISS (Keep It Simple, Stupid)**: Code is read more than written. Avoid complexity; ensure logic is self-evident.
+- **YAGNI (You Aren't Gonna Need It)**: Implement only what defines the immediate requirement. Do not speculate on future needs.
+- **DRY (Don't Repeat Yourself)**: Deduplicate logic to single sources of truth to ensure consistency and maintainability.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Structure & Design
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+<!-- SOLID, SoC -->
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+Robust architecture through discipline.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- **SOLID**: Adhere to Object-Oriented principles, specifically **Single Responsibility (SRP)** (one job per module) and **Open/Closed (OCP)** (extendable without modification).
+- **SoC (Separation of Concerns)**: Strictly decouple UI, Business Logic, and Data Access layers.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Collaboration & Intuitiveness
+
+<!-- Boy Scout Rule, Principle of Least Astonishment -->
+
+Respect for the codebase and the team.
+
+- **Boy Scout Rule**: Leave functionality and file structure cleaner than you found it. Opportunistic refactoring is mandatory.
+- **Principle of Least Astonishment**: Interfaces and behaviors must be predictable. Naming and side effects should align with caller expectations.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This document represents the non-negotiable engineering standards for Blue Banker.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+1. **Compliance**: All Pull Requests must verify alignment with these principles. Non-compliant code will be rejected.
+2. **Amendments**: Changes to this constitution require a version bump and rationale documentation.
+3. **Reference**: Design decisions (Plan Phase) and Code Reviews (Execution Phase) must explicitly cite these principles when resolving conflicts.
+
+**Version**: 1.0.0 | **Ratified**: 2026-01-23 | **Last Amended**: 2026-01-23
