@@ -41,6 +41,7 @@
 - **Framework**: Express
 - **Language**: TypeScript
 - **Communication**: Socket.io (Real-time bidirectional)
+- **Deployment**: Render (Self-Hosted Runner w/ PM2) & Cron-job.org (Keep-alive)
 - **Test**: Vitest
 
 ### Frontend
@@ -49,12 +50,32 @@
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **State/Socket**: Custom Hooks (`useGame`, `useSocket`)
+- **Deployment**: Cloudflare Pages
 - **UX**: `react-hot-toast`, `use-sound`
 
 ### Shared
 
 - **Monorepo Structure**: npm workspaces
 - **Type Safety**: Shared DTO types between frontend and backend
+
+---
+
+## ☁️ 배포 (Deployment)
+
+이 프로젝트는 프론트엔드와 백엔드가 분리되어 배포됩니다.
+
+### Backend (Self-Hosted on Render /w LXC)
+
+- **방식**: GitHub Actions Self-Hosted Runner를 통해 Render(혹은 LXC 서버)에 직접 배포
+- **특징**: PM2를 사용한 무중단 배포 관리
+- **Health Check**: `/health` 엔드포인트 제공 (Cron-job.org 연동용)
+- **CORS**: Cloudflare Pages 도메인 허용 설정 완료
+
+### Frontend (Cloudflare Pages)
+
+- **방식**: Cloudflare Pages 자동 배포 (GitHub 연동)
+- **특징**: `VITE_BACKEND_URL` 환경 변수를 통해 백엔드 주소 동적 바인딩
+- **Smart Connection**: 개발 환경(localhost)과 배포 환경(Cloudflare) 자동 감지하여 소켓 연결
 
 ---
 
