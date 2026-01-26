@@ -139,12 +139,12 @@ export const Dashboard: React.FC = () => {
                 <div className="text-2xl">💸</div>
                 <div className="text-blue-100">송금하기</div>
              </button>
-             <button 
+             <button
                 onClick={() => openModal('BUY_ASSET')}
                 className="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-2xl font-bold shadow-lg shadow-emerald-900/20 active:bg-emerald-700 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 h-32"
              >
                 <div className="text-2xl">🏠</div>
-                <div className="text-emerald-100">토지/건물/비용지불</div>
+                <div className="text-emerald-100">토지/건물 매입</div>
              </button>
              <button 
                 onClick={() => openModal('DONATE')}
@@ -208,11 +208,11 @@ export const Dashboard: React.FC = () => {
           Blue Marble Bank v0.1.0 • Connected
        </div>
 
-       <TransactionModal 
+       <TransactionModal
          isOpen={modalOpen}
          onClose={() => setModalOpen(false)}
-         onSubmit={async (type, amount, toId, assetType) => {
-             const success = await requestTransaction(type, amount, toId, assetType);
+         onSubmit={async (type, amount, toId, assetType, buildingType) => {
+             const success = await requestTransaction(type, amount, toId, assetType, buildingType);
              if (success) {
                  setModalOpen(false);
              }

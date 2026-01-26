@@ -1,7 +1,11 @@
 
+// T001: BuildingType for building classification
+export type BuildingType = 'HOTEL' | 'BUILDING' | 'VILLA';
+
 export interface Asset {
   id: string;
   type: 'LAND' | 'BUILDING';
+  buildingType?: BuildingType; // T002: Building type (only for type === 'BUILDING')
   name?: string;
   value: number;
   createdAt: number;
@@ -141,6 +145,7 @@ export interface ClientToServerEvents {
       amount: number;
       toId?: string;
       assetType?: 'LAND' | 'BUILDING';
+      buildingType?: BuildingType; // T003: Building type for BUY_ASSET
   }, callback?: (response: { success: boolean, txId?: string, error?: string }) => void) => void;
   'vote:request_fund': (amount: number) => void;
   'vote:cast': (voteId: string, approve: boolean) => void;

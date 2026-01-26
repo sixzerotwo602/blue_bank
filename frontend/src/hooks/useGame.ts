@@ -266,14 +266,14 @@ export const useGame = (roomId?: string) => {
     // localStorage.removeItem(`blue-banker-nickname-${roomId}`);
   }, [socket, roomId]);
 
-  const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING') => {
+  const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING', buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA') => {
     return new Promise<boolean>((resolve) => {
         if (!socket) {
             resolve(false);
             return;
         }
         // @ts-ignore Shared type update might not be reflected in frontend dev server yet without restart
-        socket.emit('tx:request', { type, amount, toId, assetType }, (res: any) => {
+        socket.emit('tx:request', { type, amount, toId, assetType, buildingType }, (res: any) => {
             if (!res.success) {
                 toast.error(res.error || '거래 실패');
                 playError();

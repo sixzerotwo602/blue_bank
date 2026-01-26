@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:github.com)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(git fetch:*)",
+      "Bash(npm run build:shared:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -16,7 +16,7 @@ export const registerTransactionHandlers = (
      return null;
   };
 
-  socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING' }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
+  socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA' }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
     try {
         const roomId = getRoomId();
         if (!roomId) {

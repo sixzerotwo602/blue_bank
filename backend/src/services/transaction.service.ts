@@ -1,4 +1,4 @@
-import type { Transaction, TransactionType } from '@blue-banker/shared';
+import type { Transaction, TransactionType, Asset } from '@blue-banker/shared';
 import { store } from '../models/store.js';
 import { randomUUID } from 'crypto';
 
@@ -11,6 +11,7 @@ export class TransactionService {
       amount: number;
       toId?: string;
       assetType?: 'LAND' | 'BUILDING';
+      buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; // T004: Building type
     }
   ): Transaction {
     const room = store.rooms.get(roomId);
@@ -43,21 +44,34 @@ export class TransactionService {
       case 'BUY_ASSET': {
         if (player.cash < payload.amount) throw new Error('Insufficient funds');
         const type = payload.assetType || 'LAND';
-        
-        // Generate Name (T011)
+        const buildingType = type === 'BUILDING' ? (payload.buildingType || 'BUILDING') : undefined;
+
+        // Generate Name with building type (T004, T011)
         const count = player.assets.filter(a => a.type === type).length + 1;
-        const nameType = type === 'LAND' ? '토지' : '건물';
+        let nameType = '토지';
+        if (type === 'BUILDING') {
+          switch (buildingType) {
+            case 'HOTEL': nameType = '호텔'; break;
+            case 'VILLA': nameType = '별장'; break;
+            default: nameType = '빌딩'; break;
+          }
+        }
         const name = `${nameType} #${count}`;
 
         player.cash -= payload.amount;
         player.assetValue += payload.amount;
-        player.assets.push({
+        const newAsset: Asset = {
             id: randomUUID(),
             type,
             name,
             value: payload.amount,
             createdAt: Date.now()
-        });
+        };
+        // T004: Store building type only when defined
+        if (buildingType) {
+            newAsset.buildingType = buildingType;
+        }
+        player.assets.push(newAsset);
 
         fromId = player.id;
         toId = 'BANK';
