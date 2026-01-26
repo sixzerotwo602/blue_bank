@@ -54,7 +54,9 @@ export const TransactionModal: React.FC<Props> = ({
   const formatInput = (val: string) => {
     const num = val.replace(/[^0-9]/g, '');
     if (!num) return '';
-    return parseInt(num, 10).toLocaleString('ko-KR');
+    // 최대 10자리 제한 (약 100억 원)
+    const limited = num.slice(0, 10);
+    return parseInt(limited, 10).toLocaleString('ko-KR');
   };
 
   const adjustAmount = (diff: number) => {
@@ -81,13 +83,13 @@ export const TransactionModal: React.FC<Props> = ({
   const otherPlayers = players.filter(p => p.id !== currentUserId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-0">
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-4 pt-8 sm:pt-4">
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      
-      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up sm:animate-scale-in">
+
+      <div className="relative bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up sm:animate-scale-in my-auto">
         <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
            <h3 className="font-bold text-lg text-white">{renderTitle()}</h3>
            <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
@@ -182,14 +184,14 @@ export const TransactionModal: React.FC<Props> = ({
 
            <div className="space-y-2">
              <label className="text-sm text-slate-400 font-medium">금액 입력</label>
-             <div className="relative">
+             <div className="relative min-h-[60px]">
                 <input
                    type="text"
                    inputMode="numeric"
                    value={amount}
                    onChange={(e) => setAmount(formatInput(e.target.value))}
                    placeholder="0"
-                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-4 text-2xl font-mono text-white focus:outline-none focus:border-blue-500 placeholder-slate-700 text-right"
+                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-4 pr-12 text-2xl font-mono text-white focus:outline-none focus:border-blue-500 placeholder-slate-700 text-right"
                    autoFocus
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">원</span>

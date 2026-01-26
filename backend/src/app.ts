@@ -19,16 +19,33 @@ app.get('/health', (req, res) => {
 
 export const httpServer = createServer(app);
 
+// CORS origin 설정: 프로덕션과 개발 환경 분리
+const getCorsOrigins = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction) {
+    // 프로덕션: 허용된 도메인만
+    return [
+      "https://blue-banker.pages.dev",
+      "https://*.pages.dev"
+    ];
+  }
+
+  // 개발 환경: localhost + 내부망 IP 허용
+  return [
+    "http://localhost:5173",
+    /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:5173$/,  // 192.168.*.* 대역
+    /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:5173$/, // 10.*.*.* 대역
+    /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}:5173$/, // 172.16-31.*.* 대역
+  ];
+};
+
 export const io = new Server<
   ClientToServerEvents,
   ServerToClientEvents
 >(httpServer, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "https://blue-banker.pages.dev",
-      "https://*.pages.dev"
-    ],
+    origin: getCorsOrigins(),
     credentials: true,
     methods: ['GET', 'POST'],
   },

@@ -109,7 +109,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-24">
-       <nav className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-10">
+       <nav className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-[1000]">
           <div className="font-bold text-lg bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Blue Banker</div>
           <div className="bg-slate-800 px-3 py-1 rounded-full text-xs font-mono text-slate-400">#{roomId}</div>
        </nav>

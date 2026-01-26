@@ -31,8 +31,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [reconnectFailed, setReconnectFailed] = useState(false);
 
   useEffect(() => {
-    // Use centralized BACKEND_URL logic
-    const socketUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+    // Determine backend URL based on environment
+    const getBackendUrl = (): string => {
+      // 1. 환경변수가 설정되어 있으면 우선 사용 (프로덕션)
+      if (import.meta.env.VITE_BACKEND_URL) {
+        return import.meta.env.VITE_BACKEND_URL;
+      }
+
+      // 2. 프로덕션 도메인이면 프로덕션 백엔드 사용
+      const hostname = window.location.hostname;
+      if (hostname.includes('pages.dev') || hostname.includes('blue-banker')) {
+        return 'https://blue-banker-backend.onrender.com'; // 프로덕션 백엔드
+      }
+
+      // 3. 개발 환경: 현재 접속한 호스트의 3000 포트 사용
+      //    - localhost:5173 → localhost:3000
+      //    - 192.168.x.x:5173 → 192.168.x.x:3000
+      const protocol = window.location.protocol;
+      return `${protocol}//${hostname}:3000`;
+    };
+
+    const socketUrl = getBackendUrl();
+    console.log('Connecting to backend:', socketUrl);
     
     // Configure auto-reconnection (T053)
     const newSocket = io(socketUrl, {
