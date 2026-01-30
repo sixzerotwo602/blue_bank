@@ -20,7 +20,7 @@ export const registerTransactionHandlers = (
     try {
         const roomId = getRoomId();
         if (!roomId) {
-            throw new Error('Room not found');
+            throw new Error('방을 찾을 수 없습니다');
         }
 
         const transaction = transactionService.processTransaction(roomId, socket.id, payload);
@@ -46,4 +46,16 @@ export const registerTransactionHandlers = (
         }
     }
   });
+
+  // T022: 거래 내역 조회 핸들러
+  socket.on('transaction:get_history', (callback) => {
+    try {
+      const transactions = store.getPlayerTransactions(socket.id);
+      callback(transactions);
+    } catch (error: any) {
+      // 에러 시 빈 배열 반환
+      callback([]);
+    }
+  });
 };
+

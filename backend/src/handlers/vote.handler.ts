@@ -19,11 +19,11 @@ export const registerVoteHandlers = (
   socket.on('vote:request_fund', (_amount: number) => {
     try {
         const roomId = getRoomId();
-        if (!roomId) throw new Error('Room not found');
+        if (!roomId) throw new Error('방을 찾을 수 없습니다');
 
         // T015: Use full amount
         const room = store.rooms.get(roomId);
-        if (!room) throw new Error('Room not found');
+        if (!room) throw new Error('방을 찾을 수 없습니다');
         
         const fullAmount = room.welfareFund;
         if (fullAmount <= 0) throw new Error('복지기금이 없습니다.');

@@ -197,102 +197,130 @@ export const TransactionModal: React.FC<Props> = ({
              
               {/* Quick Amounts - Grid Layout */}
               {type === 'DONATE' ? (
-                /* DONATE: 3-row grid with +15만원 full width first */
-                <div className="grid grid-cols-3 gap-1.5">
+                /* DONATE: 15만원 버튼 추가 포함 */
+                <div className="grid grid-cols-4 gap-1.5">
                    <button
                        type="button"
                        onClick={() => adjustAmount(150000)}
-                       className="col-span-3 px-3 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm text-white transition-colors whitespace-nowrap font-semibold"
+                       className="col-span-4 px-3 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm text-white transition-colors whitespace-nowrap font-semibold"
                    >
                        +15만
                    </button>
                    <button
                        type="button"
-                       onClick={() => adjustAmount(100000)}
-                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
-                   >
-                       +10만
-                   </button>
-                   <button
-                       type="button"
                        onClick={() => adjustAmount(50000)}
-                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
                    >
                        +5만
                    </button>
                    <button
                        type="button"
                        onClick={() => adjustAmount(10000)}
-                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
                    >
                        +1만
                    </button>
                    <button
                        type="button"
-                       onClick={() => adjustAmount(-100000)}
-                       className="px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                       onClick={() => adjustAmount(5000)}
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
                    >
-                       -10만
+                       +5천
+                   </button>
+                   <button
+                       type="button"
+                       onClick={() => adjustAmount(1000)}
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
+                   >
+                       +1천
                    </button>
                    <button
                        type="button"
                        onClick={() => adjustAmount(-50000)}
-                       className="px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
                    >
                        -5만
                    </button>
                    <button
                        type="button"
                        onClick={() => adjustAmount(-10000)}
-                       className="px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
                    >
                        -1만
+                   </button>
+                   <button
+                       type="button"
+                       onClick={() => adjustAmount(-5000)}
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                   >
+                       -5천
+                   </button>
+                   <button
+                       type="button"
+                       onClick={() => adjustAmount(-1000)}
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                   >
+                       -1천
                    </button>
                 </div>
               ) : (
-                /* Default: 2-row 3x2 grid */
-                <div className="grid grid-cols-3 gap-1.5">
-                   <button
-                       type="button"
-                       onClick={() => adjustAmount(100000)}
-                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
-                   >
-                       +10만
-                   </button>
+                /* Default: 4x2 grid with 5만/1만/5천/1천원 단위 */
+                <div className="grid grid-cols-4 gap-1.5">
                    <button
                        type="button"
                        onClick={() => adjustAmount(50000)}
-                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
                    >
                        +5만
                    </button>
                    <button
                        type="button"
                        onClick={() => adjustAmount(10000)}
-                       className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
                    >
                        +1만
                    </button>
                    <button
                        type="button"
-                       onClick={() => adjustAmount(-100000)}
-                       className="px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                       onClick={() => adjustAmount(5000)}
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
                    >
-                       -10만
+                       +5천
+                   </button>
+                   <button
+                       type="button"
+                       onClick={() => adjustAmount(1000)}
+                       className="px-2 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-300 transition-colors whitespace-nowrap"
+                   >
+                       +1천
                    </button>
                    <button
                        type="button"
                        onClick={() => adjustAmount(-50000)}
-                       className="px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
                    >
                        -5만
                    </button>
                    <button
                        type="button"
                        onClick={() => adjustAmount(-10000)}
-                       className="px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
                    >
                        -1만
+                   </button>
+                   <button
+                       type="button"
+                       onClick={() => adjustAmount(-5000)}
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                   >
+                       -5천
+                   </button>
+                   <button
+                       type="button"
+                       onClick={() => adjustAmount(-1000)}
+                       className="px-2 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/20 rounded-lg text-sm text-red-300 transition-colors whitespace-nowrap"
+                   >
+                       -1천
                    </button>
                 </div>
               )}

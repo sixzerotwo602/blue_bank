@@ -1,4 +1,4 @@
-import type { Vote, VoteStatus } from '@blue-banker/shared';
+import type { Vote, VoteStatus, GameEndVote } from '@blue-banker/shared';
 import { store } from '../models/store.js';
 import { randomUUID } from 'crypto';
 import { transactionService } from './transaction.service.js';
@@ -7,10 +7,10 @@ export class VoteService {
   
   createVote(roomId: string, requesterId: string, amount: number): Vote {
     const room = store.rooms.get(roomId);
-    if (!room) throw new Error('Room not found');
+    if (!room) throw new Error('방을 찾을 수 없습니다');
 
     if (room.welfareFund < amount) {
-        throw new Error('Insufficient welfare fund');
+        throw new Error('복지기금이 부족합니다');
     }
     
     // Check if active vote exists for this room?
@@ -20,7 +20,7 @@ export class VoteService {
         v => v.roomId === roomId && v.status === 'IN_PROGRESS'
     );
     if (activeVote) {
-        throw new Error('A vote is already in progress');
+        throw new Error('이미 투표가 진행 중입니다');
     }
 
     const vote: Vote = {
@@ -43,10 +43,10 @@ export class VoteService {
 
   castVote(voteId: string, voterId: string, approve: boolean): Vote {
     const vote = store.votes.get(voteId);
-    if (!vote) throw new Error('Vote not found');
+    if (!vote) throw new Error('투표를 찾을 수 없습니다');
 
     if (vote.status !== 'IN_PROGRESS') {
-        throw new Error('Vote is closed');
+        throw new Error('투표가 종료되었습니다');
     }
 
     vote.votes[voterId] = approve;
@@ -103,6 +103,98 @@ export class VoteService {
         }
     }
   }
+
+  // T053: 게임 종료 투표 시작
+  createGameEndVote(roomId: string, requesterId: string): GameEndVote {
+    const room = store.rooms.get(roomId);
+    if (!room) throw new Error('방을 찾을 수 없습니다');
+
+    // 호스트만 시작 가능
+    if (room.hostId !== requesterId) {
+        throw new Error('호스트만 게임 종료를 요청할 수 있습니다');
+    }
+
+    // 이미 게임 종료 투표가 진행 중인지 확인
+    const activeVote = Array.from(store.gameEndVotes.values()).find(
+        v => v.roomId === roomId && v.status === 'IN_PROGRESS'
+    );
+    if (activeVote) {
+        throw new Error('이미 게임 종료 투표가 진행 중입니다');
+    }
+
+    const vote: GameEndVote = {
+      id: randomUUID(),
+      roomId,
+      requesterId,
+      status: 'IN_PROGRESS',
+      votes: {},
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60000, // T054: 60초 타임아웃
+      timeoutHandledAs: 'APPROVE'
+    };
+
+    // 호스트는 자동으로 찬성
+    vote.votes[requesterId] = true;
+
+    store.gameEndVotes.set(vote.id, vote);
+    return vote;
+  }
+
+  // T057: 게임 종료 투표 처리
+  castGameEndVote(voteId: string, voterId: string, approve: boolean): GameEndVote {
+    const vote = store.gameEndVotes.get(voteId);
+    if (!vote) throw new Error('투표를 찾을 수 없습니다');
+
+    if (vote.status !== 'IN_PROGRESS') {
+        throw new Error('투표가 종료되었습니다');
+    }
+
+    vote.votes[voterId] = approve;
+    
+    // T055: 결과 집계 - 전원 동의 시 종료
+    this.checkGameEndVoteOutcome(vote);
+
+    return vote;
+  }
+
+  // T054: 타임아웃 처리 (미응답=동의)
+  processGameEndVoteTimeout(voteId: string): GameEndVote | null {
+    const vote = store.gameEndVotes.get(voteId);
+    if (!vote || vote.status !== 'IN_PROGRESS') return null;
+
+    const room = store.rooms.get(vote.roomId);
+    if (!room) return null;
+
+    // 미응답 플레이어는 동의로 처리
+    for (const player of room.players) {
+        if (!(player.id in vote.votes)) {
+            vote.votes[player.id] = true;
+        }
+    }
+
+    this.checkGameEndVoteOutcome(vote);
+    return vote;
+  }
+
+  // T055: 게임 종료 투표 결과 집계
+  private checkGameEndVoteOutcome(vote: GameEndVote) {
+    const room = store.rooms.get(vote.roomId);
+    if (!room) return;
+
+    const totalPlayers = room.players.length;
+    const votesCast = Object.keys(vote.votes).length;
+    const approvals = Object.values(vote.votes).filter(v => v).length;
+
+    // 전원 동의 시 종료
+    if (approvals === totalPlayers) {
+        vote.status = 'APPROVED';
+    } else if (votesCast === totalPlayers) {
+        // 모두 투표했지만 반대가 있으면 거부
+        vote.status = 'REJECTED';
+    }
+    // 아직 투표가 완료되지 않았으면 IN_PROGRESS 유지
+  }
 }
 
 export const voteService = new VoteService();
+

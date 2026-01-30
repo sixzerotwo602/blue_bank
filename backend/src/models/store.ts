@@ -1,4 +1,4 @@
-import type { Room, Transaction, Vote, DisconnectedSession } from '@blue-banker/shared';
+import type { Room, Transaction, Vote, DisconnectedSession, Notification, GameEndVote } from '@blue-banker/shared';
 
 class Store {
   public rooms: Map<string, Room> = new Map();
@@ -12,9 +12,27 @@ class Store {
   public votes: Map<string, Vote> = new Map();
   // Disconnected sessions for reconnection (T013)
   public disconnectedSessions: Map<string, DisconnectedSession> = new Map();
+  // T009: notifications Map 추가
+  public notifications: Map<string, Notification> = new Map();
+  // T010: gameEndVotes Map 추가
+  public gameEndVotes: Map<string, GameEndVote> = new Map();
 
   constructor() {
     this.rooms = new Map();
+  }
+
+  // T011: 플레이어별 거래 내역 조회
+  getPlayerTransactions(playerId: string): Transaction[] {
+    return Array.from(this.transactions.values())
+      .filter(tx => tx.fromId === playerId || tx.toId === playerId)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  // T012: 플레이어별 읽지 않은 알림 개수
+  getUnreadNotificationCount(playerId: string): number {
+    return Array.from(this.notifications.values())
+      .filter(n => n.targetPlayerId === playerId && !n.read)
+      .length;
   }
 
   reset() {
@@ -22,8 +40,11 @@ class Store {
     this.transactions.clear();
     this.votes.clear();
     this.disconnectedSessions.clear();
+    this.notifications.clear();
+    this.gameEndVotes.clear();
   }
 }
 
 export const store = new Store();
+
 

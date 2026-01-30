@@ -40,6 +40,9 @@
 
     "moduleDetection": "force",
     "skipLibCheck": true,
+    "paths": {
+      "@blue-banker/shared": ["../shared/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

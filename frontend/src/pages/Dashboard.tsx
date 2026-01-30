@@ -4,20 +4,34 @@ import { useGame } from '../hooks/useGame';
 import { useSocket } from '../hooks/useSocket';
 import { MoneyDisplay } from '../components/MoneyDisplay';
 import { TransactionModal } from '../components/TransactionModal';
+import { TransactionHistory } from '../components/TransactionHistory';
+import { BankReceiveModal } from '../components/BankReceiveModal';
+import { SellAssetModal } from '../components/SellAssetModal';
+import { GameEndVotePopup } from '../components/GameEndVotePopup';
 import { VotePopup } from '../components/VotePopup';
 import { RankingList } from '../components/RankingList';
 import { ConfirmModal } from '../components/ConfirmModal';
 // ConnectionStatus and KickPlayerButton are now used in RankingList
-import type { TransactionType } from '@blue-banker/shared';
+import type { TransactionType, Transaction } from '@blue-banker/shared';
 
 import { SettlementView } from '../components/SettlementView';
 
 export const Dashboard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, endGame, kickPlayer } = useGame(roomId);
+  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, kickPlayer, getTransactionHistory, bankReceive, sellAsset, gameEndVote, requestGameEnd, castGameEndVote } = useGame(roomId);
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
+  
+  // T026: 거래 내역 모달 상태
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  
+  // T043: 은행 수령 모달 상태
+  const [bankReceiveOpen, setBankReceiveOpen] = useState(false);
+  
+  // T052: 자산 매각 모달 상태
+  const [sellAssetOpen, setSellAssetOpen] = useState(false);
 
   // Confirmation Modal State
   const [confirmState, setConfirmState] = useState<{
@@ -74,14 +88,15 @@ export const Dashboard: React.FC = () => {
       });
   };
 
+  // T063: 게임 종료 - 투표 요청 방식으로 변경
   const handleGameEnd = () => {
       setConfirmState({
           isOpen: true,
-          title: '게임 종료',
-          message: '정말 게임을 종료하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
-          onConfirm: () => {
-              endGame();
+          title: '게임 종료 투표',
+          message: '게임 종료 투표를 시작하시겠습니까?\n모든 플레이어가 동의해야 게임이 종료됩니다.',
+          onConfirm: async () => {
               closeConfirm();
+              await requestGameEnd();
           }
       });
   };
@@ -105,6 +120,13 @@ export const Dashboard: React.FC = () => {
   const handleGoHome = () => {
       // Disconnect socket logic handled inside useSocket or manual simple redirect
       window.location.href = '/'; 
+  };
+  
+  // T026: 거래 내역 조회 핸들러
+  const handleOpenHistory = async () => {
+      const history = await getTransactionHistory();
+      setTransactions(history);
+      setHistoryOpen(true);
   };
 
   return (
@@ -161,6 +183,35 @@ export const Dashboard: React.FC = () => {
                 <div className="text-sm text-slate-200">월급 받기</div>
              </button>
           </section>
+          
+          {/* T026: 거래 내역 버튼 */}
+          <button
+             onClick={handleOpenHistory}
+             className="w-full bg-slate-800/50 hover:bg-slate-800 p-3 rounded-xl border border-slate-700 text-slate-300 flex items-center justify-center gap-2 transition-colors"
+          >
+             <span>📋</span>
+             <span>거래 내역 보기</span>
+          </button>
+          
+          {/* T043, T052: 은행 수령(호스트) 및 자산 매각 버튼 */}
+          <div className="grid grid-cols-2 gap-2">
+             {isHost && (
+               <button
+                  onClick={() => setBankReceiveOpen(true)}
+                  className="bg-amber-900/30 hover:bg-amber-900/50 p-3 rounded-xl border border-amber-500/30 text-amber-300 flex items-center justify-center gap-2 transition-colors"
+               >
+                  <span>🏦</span>
+                  <span className="text-sm">은행 수령</span>
+               </button>
+             )}
+             <button
+                onClick={() => setSellAssetOpen(true)}
+                className={`bg-red-900/20 hover:bg-red-900/30 p-3 rounded-xl border border-red-500/20 text-red-400 flex items-center justify-center gap-2 transition-colors ${isHost ? '' : 'col-span-2'}`}
+             >
+                <span>📤</span>
+                <span className="text-sm">자산 매각</span>
+             </button>
+          </div>
 
           {/* Welfare Fund Status */}
           <section className="bg-slate-900/50 rounded-xl p-4 border border-purple-500/20 flex justify-between items-center">
@@ -238,6 +289,42 @@ export const Dashboard: React.FC = () => {
            onCastVote={castVote}
          />
        )}
+
+        {/* T026: 거래 내역 모달 */}
+        <TransactionHistory
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          transactions={transactions}
+          currentUserId={socket?.id}
+          players={room.players}
+        />
+        
+        {/* T043: 은행 수령 모달 (호스트 전용) */}
+        <BankReceiveModal
+          isOpen={bankReceiveOpen}
+          onClose={() => setBankReceiveOpen(false)}
+          onSubmit={bankReceive}
+          players={room.players}
+          currentUserId={socket?.id}
+        />
+        
+        {/* T052: 자산 매각 모달 */}
+        <SellAssetModal
+          isOpen={sellAssetOpen}
+          onClose={() => setSellAssetOpen(false)}
+          onSubmit={sellAsset}
+          assets={me?.assets || []}
+        />
+        
+        {/* T063: 게임 종료 투표 팝업 */}
+        {gameEndVote && room && (
+          <GameEndVotePopup
+            vote={gameEndVote}
+            players={room.players}
+            currentUserId={socket?.id}
+            onCastVote={castGameEndVote}
+          />
+        )}
 
        {/* Settlement Overlay */}
        <SettlementView rankings={rankings} onGoHome={handleGoHome} />
