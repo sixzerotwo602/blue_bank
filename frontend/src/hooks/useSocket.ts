@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 import { useContext } from 'react';
 import { SocketContext } from '../services/socketContext';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:15645";
 
 export const socket = io(BACKEND_URL, {
   autoConnect: false,
