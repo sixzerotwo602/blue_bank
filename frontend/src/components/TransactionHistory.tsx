@@ -30,8 +30,10 @@ const getTransactionDetail = (
       return `${getPlayerName(tx.fromId)} → ${getPlayerName(tx.toId)}`;
     case 'BUY_ASSET':
       if (tx.description) {
-        // description에 자산 정보가 포함됨
-        return tx.description;
+        // description에 자산 정보가 포함됨 (영문 타입이 아닌 경우에만 표시)
+        if (!isTransactionTypeString(tx.description)) {
+          return tx.description;
+        }
       }
       return null;
     case 'SELL_ASSET':
@@ -41,26 +43,64 @@ const getTransactionDetail = (
                          tx.soldAsset.assetName?.includes('빌딩') ? '빌딩' : '토지';
         return `${tx.soldAsset.assetName} (${assetType}) - 원가: ${formatManwon(tx.soldAsset.originalValue)}`;
       }
-      return tx.description || null;
+      // description이 영문 타입인 경우 표시하지 않음
+      if (tx.description && !isTransactionTypeString(tx.description)) {
+        return tx.description;
+      }
+      return null;
     case 'BANK_RECEIVE':
       if (tx.reason) {
         const reasonLabels: Record<string, string> = {
           LOTTERY: '복권 당첨',
           PRIZE: '우승 상금',
           BONUS: '보너스',
-          OTHER: tx.description || '기타',
+          OTHER: tx.description && !isTransactionTypeString(tx.description) ? tx.description : '기타',
         };
         return reasonLabels[tx.reason] || tx.reason;
       }
-      return tx.description || null;
-    case 'PAY_COST':
-    case 'DONATE':
+      // description이 영문 타입인 경우 표시하지 않음
+      if (tx.description && !isTransactionTypeString(tx.description)) {
+        return tx.description;
+      }
+      return null;
     case 'SALARY':
+      // 월급은 출발지 통과로 발생하므로 별도 상세 정보 불필요
+      return null;
+    case 'PAY_COST':
+      // description이 영문 타입이 아닌 경우에만 표시
+      if (tx.description && !isTransactionTypeString(tx.description)) {
+        return tx.description;
+      }
+      return null;
+    case 'DONATE':
+      // description이 영문 타입이 아닌 경우에만 표시
+      if (tx.description && !isTransactionTypeString(tx.description)) {
+        return tx.description;
+      }
+      return null;
     case 'WELFARE_RECEIVE':
-      return tx.description || null;
+      // description이 영문 타입이 아닌 경우에만 표시
+      if (tx.description && !isTransactionTypeString(tx.description)) {
+        return tx.description;
+      }
+      return null;
     default:
-      return tx.description || null;
+      // description이 영문 타입이 아닌 경우에만 표시
+      if (tx.description && !isTransactionTypeString(tx.description)) {
+        return tx.description;
+      }
+      return null;
   }
+};
+
+// 영문 거래 타입 문자열인지 확인하는 헬퍼 함수
+const TRANSACTION_TYPE_STRINGS = [
+  'TRANSFER', 'BUY_ASSET', 'PAY_COST', 'DONATE', 
+  'SALARY', 'WELFARE_RECEIVE', 'BANK_RECEIVE', 'SELL_ASSET'
+];
+
+const isTransactionTypeString = (str: string): boolean => {
+  return TRANSACTION_TYPE_STRINGS.includes(str.toUpperCase());
 };
 
 export const TransactionHistory: React.FC<Props> = ({ 

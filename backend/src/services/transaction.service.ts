@@ -15,6 +15,7 @@ export class TransactionService {
       landName?: string; // T021: 토지 매입 시 토지명
       selectedLandId?: string; // T022: 건물 매입 시 토지 ID
       villaCount?: number; // T023: 별장 갯수 (1 또는 2)
+      reason?: string; // T008: 은행 수령 사유 (BANK_RECEIVE)
     }
   ): Transaction {
     const room = store.rooms.get(roomId);
@@ -148,6 +149,16 @@ export class TransactionService {
         player.cash += payload.amount;
         fromId = 'BANK';
         toId = player.id;
+        
+        // T008: reason에 따른 한글 상세 설명 생성
+        const reasonLabels: Record<string, string> = {
+          LOTTERY: '복권 당첨',
+          PRIZE: '우승 상금',
+          BONUS: '보너스',
+          OTHER: '기타'
+        };
+        const reasonLabel = reasonLabels[payload.reason || ''] || '은행 지급';
+        txDescription = reasonLabel;
         break;
       }
 
@@ -183,7 +194,9 @@ export class TransactionService {
       fromId,
       toId,
       timestamp: Date.now(),
-      description: txDescription || payload.type
+      description: txDescription || payload.type,
+      // T008: BANK_RECEIVE인 경우 reason 저장
+      ...(payload.type === 'BANK_RECEIVE' && payload.reason ? { reason: payload.reason } : {})
     };
 
     store.transactions.set(transaction.id, transaction);
