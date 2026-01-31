@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Transaction, TransactionType } from '@blue-banker/shared';
 import { formatManwon } from '../utils/formatMoney';
-import { TRANSACTION_LABELS, TRANSACTION_ICONS, ASSET_TYPE_LABELS } from '../utils/transactionLabels';
+import { TRANSACTION_LABELS, TRANSACTION_ICONS } from '../utils/transactionLabels';
 
 interface Props {
   isOpen: boolean;

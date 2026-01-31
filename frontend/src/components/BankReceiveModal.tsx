@@ -27,7 +27,7 @@ export const BankReceiveModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onSubmit,
-  currentUserId,
+  currentUserId: _currentUserId,
   currentUserNickname,
 }) => {
   const [amount, setAmount] = useState<number>(0);

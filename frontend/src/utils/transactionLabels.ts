@@ -2,7 +2,7 @@
  * T001: 거래 유형 한글 매핑
  * 거래 유형 코드를 한글 라벨로 변환
  */
-import { TransactionType, Asset } from 'shared';
+import type { TransactionType, Asset } from '@blue-banker/shared';
 
 export const TRANSACTION_LABELS: Record<TransactionType, string> = {
   TRANSFER: '송금',
