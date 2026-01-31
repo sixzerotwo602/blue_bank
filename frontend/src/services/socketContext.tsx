@@ -33,22 +33,27 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     // Determine backend URL based on environment
     const getBackendUrl = (): string => {
-      // 1. 환경변수가 설정되어 있으면 우선 사용 (프로덕션)
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+
+      // 1. 프로덕션 환경 (도메인 체크)
+      const isProduction = hostname.includes('pages.dev') || hostname.includes('blue-banker');
+      if (isProduction) {
+        return import.meta.env.VITE_BACKEND_URL || 'https://blue-banker-backend.onrender.com';
+      }
+
+      // 2. 개발 환경: 내부망(IP) 접속 시 우선 처리
+      // .env에 localhost가 설정되어 있어도, 모바일 접속(IP) 시에는 해당 IP를 사용해야 함
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        return `${protocol}//${hostname}:15645`;
+      }
+
+      // 3. 개발 환경: localhost 접속 (환경변수 우선)
       if (import.meta.env.VITE_BACKEND_URL) {
         return import.meta.env.VITE_BACKEND_URL;
       }
 
-      // 2. 프로덕션 도메인이면 프로덕션 백엔드 사용
-      const hostname = window.location.hostname;
-      if (hostname.includes('pages.dev') || hostname.includes('blue-banker')) {
-        return 'https://blue-banker-backend.onrender.com'; // 프로덕션 백엔드
-      }
-
-      // 3. 개발 환경: 현재 접속한 호스트의 3000 포트 사용
-      //    - localhost:5173 → localhost:3000
-      //    - 192.168.x.x:5173 → 192.168.x.x:3000
-      const protocol = window.location.protocol;
-      return `${protocol}//${hostname}:3000`;
+      return `${protocol}//${hostname}:15645`;
     };
 
     const socketUrl = getBackendUrl();
@@ -118,4 +123,3 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     </SocketContext.Provider>
   );
 };
-

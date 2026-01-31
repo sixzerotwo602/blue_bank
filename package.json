@@ -5,5 +5,9 @@
     "backend",
     "frontend",
     "shared"
-  ]
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend -- --host"
+  }
 }
