@@ -6,6 +6,7 @@ interface Props {
   players: Player[];
   currentUserId?: string;
   onCastVote: (voteId: string, approve: boolean) => void;
+  onCancelVote?: (voteId: string) => void; // T048: 취소 콜백
 }
 
 /**
@@ -17,6 +18,7 @@ export const GameEndVotePopup: React.FC<Props> = ({
   players,
   currentUserId,
   onCastVote,
+  onCancelVote,
 }) => {
   const [remainingTime, setRemainingTime] = useState(60);
 
@@ -123,6 +125,16 @@ export const GameEndVotePopup: React.FC<Props> = ({
             <div className="text-center text-slate-400 py-2">
               투표 완료! 다른 플레이어의 응답을 기다리는 중...
             </div>
+          )}
+
+          {/* T048-T050: 호스트(요청자)만 취소 버튼 표시 */}
+          {currentUserId === vote.requesterId && onCancelVote && (
+            <button
+              onClick={() => onCancelVote(vote.id)}
+              className="w-full bg-slate-700 hover:bg-slate-600 p-3 rounded-xl font-bold transition-colors text-slate-300 mt-2"
+            >
+              투표 취소
+            </button>
           )}
         </div>
       </div>

@@ -27,10 +27,10 @@ npm test; npm run lint
 TypeScript 5.3: Follow standard conventions
 
 ## Recent Changes
+- 008-ux-bugfix-improvements: Added TypeScript 5.x (Backend: 5.9.3, Frontend: 5.3.3)
 - 007-banking-features-v2: Added TypeScript 5.x (Backend: 5.9.3, Frontend: 5.3.3)
 - 006-ux-banking-improvement: Added TypeScript 5.x (monorepo: shared, backend, frontend)
 
-- 005-ui-input-fix: Added TypeScript 5.3 + React 18.2, Tailwind CSS 3.4, Vite 5.1
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

@@ -18,7 +18,7 @@ import { SettlementView } from '../components/SettlementView';
 
 export const Dashboard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, kickPlayer, getTransactionHistory, bankReceive, sellAsset, gameEndVote, requestGameEnd, castGameEndVote } = useGame(roomId);
+  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, kickPlayer, getTransactionHistory, bankReceive, sellAsset, gameEndVote, requestGameEnd, castGameEndVote, cancelGameEndVote } = useGame(roomId);
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
@@ -137,17 +137,17 @@ export const Dashboard: React.FC = () => {
        </nav>
 
        <main className="p-4 space-y-5">
-          {/* Status Card */}
+          {/* Status Card - T040: clickable prop 추가 */}
           <section className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 shadow-xl border border-white/5 relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl">💰</div>
              <div className="relative z-10">
-                <div className="text-slate-400 text-sm mb-1 font-medium">내 현금 자산</div>
+                <div className="text-slate-400 text-sm mb-1 font-medium">내 현금 자산 <span className="text-xs text-slate-500">(탭하여 형식 변경)</span></div>
                 <div className="text-4xl font-bold text-green-400 mb-4 tracking-tight">
-                   <MoneyDisplay amount={me?.cash || 0} />
+                   <MoneyDisplay amount={me?.cash || 0} clickable />
                 </div>
                 <div className="flex items-center gap-2 text-sm bg-slate-950/30 p-3 rounded-lg w-fit border border-white/5">
                    <span className="text-slate-400">총 부동산 가치:</span>
-                   <span className="text-blue-300 font-mono"><MoneyDisplay amount={me?.assetValue || 0} showCurrency={false} /></span>
+                   <span className="text-blue-300 font-mono"><MoneyDisplay amount={me?.assetValue || 0} showCurrency={false} clickable /></span>
                 </div>
              </div>
           </section>
@@ -193,20 +193,18 @@ export const Dashboard: React.FC = () => {
              <span>거래 내역 보기</span>
           </button>
           
-          {/* T043, T052: 은행 수령(호스트) 및 자산 매각 버튼 */}
+          {/* T012: 은행 수령(모든 플레이어) 및 자산 매각 버튼 */}
           <div className="grid grid-cols-2 gap-2">
-             {isHost && (
-               <button
-                  onClick={() => setBankReceiveOpen(true)}
-                  className="bg-amber-900/30 hover:bg-amber-900/50 p-3 rounded-xl border border-amber-500/30 text-amber-300 flex items-center justify-center gap-2 transition-colors"
-               >
-                  <span>🏦</span>
-                  <span className="text-sm">은행 수령</span>
-               </button>
-             )}
+             <button
+                onClick={() => setBankReceiveOpen(true)}
+                className="bg-amber-900/30 hover:bg-amber-900/50 p-3 rounded-xl border border-amber-500/30 text-amber-300 flex items-center justify-center gap-2 transition-colors"
+             >
+                <span>🏦</span>
+                <span className="text-sm">은행 수령</span>
+             </button>
              <button
                 onClick={() => setSellAssetOpen(true)}
-                className={`bg-red-900/20 hover:bg-red-900/30 p-3 rounded-xl border border-red-500/20 text-red-400 flex items-center justify-center gap-2 transition-colors ${isHost ? '' : 'col-span-2'}`}
+                className="bg-red-900/20 hover:bg-red-900/30 p-3 rounded-xl border border-red-500/20 text-red-400 flex items-center justify-center gap-2 transition-colors"
              >
                 <span>📤</span>
                 <span className="text-sm">자산 매각</span>
@@ -262,8 +260,9 @@ export const Dashboard: React.FC = () => {
        <TransactionModal
          isOpen={modalOpen}
          onClose={() => setModalOpen(false)}
-         onSubmit={async (type, amount, toId, assetType, buildingType) => {
-             const success = await requestTransaction(type, amount, toId, assetType, buildingType);
+         onSubmit={async (type, amount, toId, assetType, buildingType, landName, selectedLandId, villaCount) => {
+             // T028: 토지/건물 매입 시 추가 정보 전달
+             const success = await requestTransaction(type, amount, toId, assetType, buildingType, landName, selectedLandId, villaCount);
              if (success) {
                  setModalOpen(false);
              }
@@ -299,13 +298,13 @@ export const Dashboard: React.FC = () => {
           players={room.players}
         />
         
-        {/* T043: 은행 수령 모달 (호스트 전용) */}
+        {/* T012: 은행 수령 모달 (모든 플레이어 사용 가능) */}
         <BankReceiveModal
           isOpen={bankReceiveOpen}
           onClose={() => setBankReceiveOpen(false)}
-          onSubmit={bankReceive}
-          players={room.players}
+          onSubmit={(amount, reason) => bankReceive(socket?.id || '', amount, reason)}
           currentUserId={socket?.id}
+          currentUserNickname={me?.nickname}
         />
         
         {/* T052: 자산 매각 모달 */}
@@ -316,13 +315,14 @@ export const Dashboard: React.FC = () => {
           assets={me?.assets || []}
         />
         
-        {/* T063: 게임 종료 투표 팝업 */}
+        {/* T063: 게임 종료 투표 팝업 - T049: 취소 버튼 추가 */}
         {gameEndVote && room && (
           <GameEndVotePopup
             vote={gameEndVote}
             players={room.players}
             currentUserId={socket?.id}
             onCastVote={castGameEndVote}
+            onCancelVote={cancelGameEndVote}
           />
         )}
 

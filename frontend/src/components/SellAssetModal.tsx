@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { Asset } from '@blue-banker/shared';
 import { formatManwon } from '../utils/formatMoney';
+// T029: getAssetDisplayInfo import
+import { getAssetDisplayInfo } from '../utils/transactionLabels';
 
 interface Props {
   isOpen: boolean;
@@ -8,24 +10,6 @@ interface Props {
   onSubmit: (assetId: string) => void;
   assets: Asset[];
 }
-
-const getAssetIcon = (type: string, buildingType?: string): string => {
-  if (type === 'LAND') return '🏞️';
-  switch (buildingType) {
-    case 'HOTEL': return '🏨';
-    case 'VILLA': return '🏡';
-    default: return '🏢';
-  }
-};
-
-const getAssetLabel = (asset: Asset): string => {
-  if (asset.type === 'LAND') return '토지';
-  switch (asset.buildingType) {
-    case 'HOTEL': return '호텔';
-    case 'VILLA': return '별장';
-    default: return '빌딩';
-  }
-};
 
 /**
  * T047-T050: SellAssetModal 컴포넌트
@@ -78,14 +62,16 @@ export const SellAssetModal: React.FC<Props> = ({
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* T049: 매각 확인 모달 */}
-          {confirmMode && selectedAssetData ? (
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {/* T029-T031: 매각 확인 모달 - getAssetDisplayInfo 사용 */}
+          {confirmMode && selectedAssetData ? (() => {
+            const displayInfo = getAssetDisplayInfo(selectedAssetData);
+            return (
             <div className="space-y-4">
               <div className="text-center py-4">
-                <div className="text-4xl mb-2">{getAssetIcon(selectedAssetData.type, selectedAssetData.buildingType)}</div>
-                <div className="text-xl font-bold text-white mb-1">{selectedAssetData.name}</div>
-                <div className="text-slate-400">{getAssetLabel(selectedAssetData)}</div>
+                <div className="text-4xl mb-2">{displayInfo.icon}</div>
+                <div className="text-xl font-bold text-white mb-1">{displayInfo.primary}</div>
+                <div className="text-slate-400">{displayInfo.secondary}</div>
               </div>
 
               <div className="bg-slate-800 rounded-xl p-4 space-y-2">
@@ -118,8 +104,8 @@ export const SellAssetModal: React.FC<Props> = ({
                 </button>
               </div>
             </div>
-          ) : (
-            /* T048, T050: 보유 자산 목록 표시 */
+          );})() : (
+            /* T030-T031: 보유 자산 목록 표시 - getAssetDisplayInfo 사용 */
             <div className="space-y-2">
               {assets.length === 0 ? (
                 <div className="text-center text-slate-500 py-8">
@@ -127,23 +113,26 @@ export const SellAssetModal: React.FC<Props> = ({
                   <p>보유 자산이 없습니다.</p>
                 </div>
               ) : (
-                assets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    onClick={() => handleSelectAsset(asset.id)}
-                    className="w-full bg-slate-800 hover:bg-slate-700 p-4 rounded-xl border border-slate-700 transition-all flex items-center gap-3 text-left"
-                  >
-                    <div className="text-2xl">{getAssetIcon(asset.type, asset.buildingType)}</div>
-                    <div className="flex-1">
-                      <div className="font-bold text-white">{asset.name}</div>
-                      <div className="text-sm text-slate-400">{getAssetLabel(asset)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-slate-400 text-sm line-through">{formatManwon(asset.value)}</div>
-                      <div className="text-red-400 font-bold">{formatManwon(Math.floor(asset.value * 0.5))}</div>
-                    </div>
-                  </button>
-                ))
+                assets.map((asset) => {
+                  const displayInfo = getAssetDisplayInfo(asset);
+                  return (
+                    <button
+                      key={asset.id}
+                      onClick={() => handleSelectAsset(asset.id)}
+                      className="w-full bg-slate-800 hover:bg-slate-700 p-4 rounded-xl border border-slate-700 transition-all flex items-center gap-3 text-left"
+                    >
+                      <div className="text-2xl">{displayInfo.icon}</div>
+                      <div className="flex-1">
+                        <div className="font-bold text-white">{displayInfo.primary}</div>
+                        <div className="text-sm text-slate-400">{displayInfo.secondary}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-slate-400 text-sm line-through">{formatManwon(asset.value)}</div>
+                        <div className="text-red-400 font-bold">{formatManwon(Math.floor(asset.value * 0.5))}</div>
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </div>
           )}

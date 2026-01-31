@@ -21,3 +21,21 @@ export function formatManwon(amount: number): string {
 export function formatWon(amount: number): string {
   return `${amount.toLocaleString()}원`;
 }
+
+/**
+ * T005: 만원 단위 문자열을 원 단위 숫자로 변환
+ * "586만원" → 5860000
+ * "5,860,000" → 5860000
+ */
+export function parseManwonToWon(displayAmount: string): number {
+  if (!displayAmount) return 0;
+
+  // "586만원" 형태인 경우
+  if (displayAmount.includes('만원')) {
+    const manwon = parseFloat(displayAmount.replace(/[^0-9.]/g, ''));
+    return Math.floor(manwon * 10000);
+  }
+
+  // "5,860,000원" 또는 "5,860,000" 형태인 경우
+  return parseInt(displayAmount.replace(/[^0-9]/g, ''), 10) || 0;
+}

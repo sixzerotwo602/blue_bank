@@ -12,6 +12,9 @@ export class TransactionService {
       toId?: string;
       assetType?: 'LAND' | 'BUILDING';
       buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; // T004: Building type
+      landName?: string; // T021: 토지 매입 시 토지명
+      selectedLandId?: string; // T022: 건물 매입 시 토지 ID
+      villaCount?: number; // T023: 별장 갯수 (1 또는 2)
     }
   ): Transaction {
     const room = store.rooms.get(roomId);
@@ -24,6 +27,7 @@ export class TransactionService {
 
     let fromId: string | 'BANK' | 'FUND' = requesterId;
     let toId: string | 'BANK' | 'FUND' = 'BANK';
+    let txDescription: string | undefined;
 
     switch (payload.type) {
       case 'TRANSFER': {
@@ -46,17 +50,39 @@ export class TransactionService {
         const type = payload.assetType || 'LAND';
         const buildingType = type === 'BUILDING' ? (payload.buildingType || 'BUILDING') : undefined;
 
-        // Generate Name with building type (T004, T011)
-        const count = player.assets.filter(a => a.type === type).length + 1;
-        let nameType = '토지';
-        if (type === 'BUILDING') {
+        let name: string;
+        let description: string | undefined;
+
+        if (type === 'LAND') {
+          // T021: 토지 매입 - 사용자 입력 토지명 사용
+          name = payload.landName?.trim() || `토지 #${player.assets.filter(a => a.type === 'LAND').length + 1}`;
+          description = `토지 '${name}' 매입`;
+        } else {
+          // T022-T023: 건물 매입 - 선택한 토지 위에 건물 생성
+          const selectedLand = player.assets.find(a => a.id === payload.selectedLandId);
+          const landNameStr = selectedLand?.name || '토지';
+
           switch (buildingType) {
-            case 'HOTEL': nameType = '호텔'; break;
-            case 'VILLA': nameType = '별장'; break;
-            default: nameType = '빌딩'; break;
+            case 'HOTEL':
+              name = `${landNameStr} 호텔`;
+              description = `'${landNameStr}' 토지 위에 호텔 건설`;
+              break;
+            case 'VILLA': {
+              // 별장 번호 계산 (같은 토지 위 별장 개수 + 1)
+              const villaCount = payload.villaCount || 1;
+              const existingVillasOnLand = player.assets.filter(
+                a => a.buildingType === 'VILLA' && a.name?.startsWith(`${landNameStr} 별장`)
+              ).length;
+              name = `${landNameStr} 별장${existingVillasOnLand + 1}`;
+              description = `'${landNameStr}' 토지 위에 별장 ${villaCount}개 건설`;
+              break;
+            }
+            default:
+              name = `${landNameStr} 빌딩`;
+              description = `'${landNameStr}' 토지 위에 빌딩 건설`;
+              break;
           }
         }
-        const name = `${nameType} #${count}`;
 
         player.cash -= payload.amount;
         player.assetValue += payload.amount;
@@ -75,6 +101,7 @@ export class TransactionService {
 
         fromId = player.id;
         toId = 'BANK';
+        txDescription = description;
         break;
       }
 
@@ -109,16 +136,18 @@ export class TransactionService {
           toId = player.id;
           break;
 
-      // T036: 은행 수령 (복권, 우승상금, 보너스 등)
+      // T014: 은행 수령 (복권, 우승상금, 보너스 등) - 개인화
+      // 모든 플레이어가 본인 계좌로 직접 수령 가능
       case 'BANK_RECEIVE': {
-        // 호스트가 지정한 플레이어에게 은행에서 지급
+        // 본인 계좌로만 수령 가능 (toId가 있더라도 본인만 허용)
         const targetId = payload.toId || requesterId;
-        const targetPlayer = room.players.find(p => p.id === targetId);
-        if (!targetPlayer) throw new Error('대상 플레이어를 찾을 수 없습니다');
-        
-        targetPlayer.cash += payload.amount;
+        if (targetId !== requesterId) {
+          throw new Error('본인 계좌로만 수령할 수 있습니다');
+        }
+
+        player.cash += payload.amount;
         fromId = 'BANK';
-        toId = targetPlayer.id;
+        toId = player.id;
         break;
       }
 
@@ -154,7 +183,7 @@ export class TransactionService {
       fromId,
       toId,
       timestamp: Date.now(),
-      description: payload.type
+      description: txDescription || payload.type
     };
 
     store.transactions.set(transaction.id, transaction);

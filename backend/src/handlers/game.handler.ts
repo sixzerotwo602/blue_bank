@@ -127,12 +127,12 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
   socket.on('game_end_vote:cast', (voteId: string, approve: boolean, callback: (res: { success: boolean; error?: string }) => void) => {
       try {
           const vote = voteService.castGameEndVote(voteId, socket.id, approve);
-          
+
           // T058: game_end_vote:updated 이벤트 emit
           const room = store.rooms.get(vote.roomId);
           if (room) {
               io.to(vote.roomId).emit('game_end_vote:updated', vote);
-              
+
               // 투표 완료 확인
               if (vote.status === 'APPROVED') {
                   room.status = 'ENDED';
@@ -147,7 +147,7 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
                       }))
                       .sort((a, b) => b.totalAssets - a.totalAssets);
                   rankings.forEach((r, index) => { r.rank = index + 1; });
-                  
+
                   io.to(vote.roomId).emit('game_end_vote:ended', vote);
                   io.to(vote.roomId).emit('game:ended', { rankings });
                   io.to(vote.roomId).emit('room:sync', room);
@@ -155,10 +155,27 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
                   io.to(vote.roomId).emit('game_end_vote:ended', vote);
               }
           }
-          
+
           callback({ success: true });
       } catch (error: any) {
           callback({ success: false, error: error.message || '투표 실패' });
+      }
+  });
+
+  // T047: game_end_vote:cancel 이벤트 핸들러 - 게임 종료 투표 취소
+  socket.on('game_end_vote:cancel', (voteId: string, callback: (res: { success: boolean; error?: string }) => void) => {
+      try {
+          const vote = voteService.cancelGameEndVote(voteId, socket.id);
+
+          const room = store.rooms.get(vote.roomId);
+          if (room) {
+              // 취소된 투표 브로드캐스트
+              io.to(vote.roomId).emit('game_end_vote:ended', vote);
+          }
+
+          callback({ success: true });
+      } catch (error: any) {
+          callback({ success: false, error: error.message || '투표 취소 실패' });
       }
   });
 };

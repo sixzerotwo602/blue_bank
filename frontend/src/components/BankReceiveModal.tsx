@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import type { Player, BankReceiveReason } from '@blue-banker/shared';
+import type { BankReceiveReason } from '@blue-banker/shared';
 import { formatManwon } from '../utils/formatMoney';
+import { MAX_AMOUNT } from '../utils/constants';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (playerId: string, amount: number, reason: BankReceiveReason) => void;
-  players: Player[];
+  onSubmit: (amount: number, reason: BankReceiveReason) => void;
   currentUserId?: string;
+  currentUserNickname?: string;
 }
 
 const REASONS: { value: BankReceiveReason; label: string; icon: string }[] = [
@@ -18,33 +19,32 @@ const REASONS: { value: BankReceiveReason; label: string; icon: string }[] = [
 ];
 
 /**
- * T039-T041: BankReceiveModal 컴포넌트
- * 호스트가 플레이어에게 은행 지급을 수행할 수 있는 모달
+ * T012-T013: BankReceiveModal 컴포넌트 (개인화)
+ * 모든 플레이어가 직접 본인 계좌로 은행 수령 가능
+ * 플레이어 선택 UI 제거됨
  */
 export const BankReceiveModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onSubmit,
-  players,
   currentUserId,
+  currentUserNickname,
 }) => {
-  const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [amount, setAmount] = useState<number>(0);
   const [reason, setReason] = useState<BankReceiveReason>('OTHER');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayer || amount <= 0) return;
-    onSubmit(selectedPlayer, amount, reason);
+    if (amount <= 0 || amount > MAX_AMOUNT) return;
+    onSubmit(amount, reason);
     // Reset form
-    setSelectedPlayer('');
     setAmount(0);
     setReason('OTHER');
     onClose();
   };
 
   const adjustAmount = (delta: number) => {
-    setAmount(prev => Math.max(0, prev + delta));
+    setAmount(prev => Math.max(0, Math.min(MAX_AMOUNT, prev + delta)));
   };
 
   if (!isOpen) return null;
@@ -60,28 +60,18 @@ export const BankReceiveModal: React.FC<Props> = ({
         <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-gradient-to-r from-amber-900/50 to-orange-900/50">
           <h3 className="font-bold text-lg text-white flex items-center gap-2">
             <span>🏦</span>
-            은행 수령 (호스트)
+            은행 수령
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* 플레이어 선택 */}
-          <div>
-            <label className="block text-sm text-slate-400 mb-2">받을 플레이어</label>
-            <select
-              value={selectedPlayer}
-              onChange={(e) => setSelectedPlayer(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white"
-              required
-            >
-              <option value="">-- 플레이어 선택 --</option>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.nickname} {player.id === currentUserId ? '(나)' : ''}
-                </option>
-              ))}
-            </select>
+          {/* T012: 플레이어 선택 UI 제거 - 본인 계좌 표시 */}
+          <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+            <div className="text-sm text-slate-400 mb-1">수령 계좌</div>
+            <div className="text-lg font-semibold text-white">
+              {currentUserNickname || '나'} (본인)
+            </div>
           </div>
 
           {/* 사유 선택 */}
@@ -141,10 +131,10 @@ export const BankReceiveModal: React.FC<Props> = ({
           {/* 제출 버튼 */}
           <button
             type="submit"
-            disabled={!selectedPlayer || amount <= 0}
+            disabled={amount <= 0}
             className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 p-4 rounded-xl font-bold transition-colors"
           >
-            지급하기
+            수령하기
           </button>
         </form>
       </div>

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Player, Asset } from '@blue-banker/shared';
 import { MoneyDisplay } from './MoneyDisplay';
 import { ConnectionStatus } from './ConnectionStatus';
 import { KickPlayerButton } from './KickPlayerButton';
+import { PlayerAssetModal } from './PlayerAssetModal';
 
 type BuildingType = 'HOTEL' | 'BUILDING' | 'VILLA';
 
@@ -71,13 +72,16 @@ const formatValue = (value: number): string => {
   return `${man.toLocaleString('ko-KR')}만`;
 };
 
-export const RankingList: React.FC<Props> = ({ 
-  players, 
-  currentUserId, 
+export const RankingList: React.FC<Props> = ({
+  players,
+  currentUserId,
   className = '',
   isHost = false,
   onKick
 }) => {
+  // T035: 선택된 플레이어 상태
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
   const sortedPlayers = [...players].sort((a, b) => {
     const totalA = a.cash + a.assetValue;
     const totalB = b.cash + b.assetValue;
@@ -106,7 +110,8 @@ export const RankingList: React.FC<Props> = ({
              return (
                  <div
                    key={player.id}
-                   className={`flex items-center justify-between p-3 rounded-xl transition-all ${
+                   onClick={() => setSelectedPlayer(player)}
+                   className={`flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer hover:bg-slate-700/50 ${
                       isMe ? 'bg-blue-900/30 border border-blue-500/30' : 'bg-slate-800/50 border border-transparent'
                    }`}
                  >
@@ -168,6 +173,13 @@ export const RankingList: React.FC<Props> = ({
              );
           })}
        </div>
+
+       {/* T037: PlayerAssetModal */}
+       <PlayerAssetModal
+         isOpen={selectedPlayer !== null}
+         onClose={() => setSelectedPlayer(null)}
+         player={selectedPlayer}
+       />
     </div>
   );
 };

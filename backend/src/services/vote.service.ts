@@ -194,6 +194,24 @@ export class VoteService {
     }
     // 아직 투표가 완료되지 않았으면 IN_PROGRESS 유지
   }
+
+  // T046: 게임 종료 투표 취소 (호스트만 가능)
+  cancelGameEndVote(voteId: string, requesterId: string): GameEndVote {
+    const vote = store.gameEndVotes.get(voteId);
+    if (!vote) throw new Error('투표를 찾을 수 없습니다');
+
+    if (vote.status !== 'IN_PROGRESS') {
+        throw new Error('투표가 이미 종료되었습니다');
+    }
+
+    // 투표 요청자만 취소 가능
+    if (vote.requesterId !== requesterId) {
+        throw new Error('투표 요청자만 취소할 수 있습니다');
+    }
+
+    vote.status = 'REJECTED';
+    return vote;
+  }
 }
 
 export const voteService = new VoteService();

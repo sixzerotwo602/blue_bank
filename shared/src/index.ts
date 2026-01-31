@@ -248,6 +248,8 @@ export interface ClientToServerEvents {
   'game:request_end': (roomId: string, callback: (response: { success: boolean; error?: string; voteId?: string }) => void) => void;
   // NEW: 게임 종료 투표 응답
   'game_end_vote:cast': (voteId: string, approve: boolean, callback: (response: { success: boolean; error?: string }) => void) => void;
+  // T004: 게임 종료 투표 취소
+  'game_end_vote:cancel': (voteId: string, callback: (response: { success: boolean; error?: string }) => void) => void;
   // NEW: 알림 읽음 처리
   'notification:mark_read': (notificationId: string, callback?: (response: { success: boolean }) => void) => void;
   'notification:mark_all_read': (callback?: (response: { success: boolean; count?: number }) => void) => void;

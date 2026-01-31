@@ -1,6 +1,7 @@
 import React from 'react';
-import type { Transaction } from '@blue-banker/shared';
+import type { Transaction, TransactionType } from '@blue-banker/shared';
 import { formatManwon } from '../utils/formatMoney';
+import { TRANSACTION_LABELS, TRANSACTION_ICONS, ASSET_TYPE_LABELS } from '../utils/transactionLabels';
 
 interface Props {
   isOpen: boolean;
@@ -10,33 +11,55 @@ interface Props {
   players: { id: string; nickname: string }[];
 }
 
-// T024: 거래 유형별 한글 표시
-const getTransactionTypeLabel = (type: string): string => {
-  switch (type) {
-    case 'TRANSFER': return '송금';
-    case 'BUY_ASSET': return '부동산 매입';
-    case 'PAY_COST': return '은행 납부';
-    case 'DONATE': return '복지기금 기부';
-    case 'SALARY': return '월급 수령';
-    case 'WELFARE_RECEIVE': return '복지기금 수령';
-    case 'BANK_RECEIVE': return '은행 수령';
-    case 'SELL_ASSET': return '자산 매각';
-    default: return type;
-  }
+// T007-T008: transactionLabels.ts에서 가져온 상수 사용
+const getTransactionTypeLabel = (type: TransactionType): string => {
+  return TRANSACTION_LABELS[type] || type;
 };
 
-// 거래 유형별 아이콘
-const getTransactionIcon = (type: string): string => {
-  switch (type) {
-    case 'TRANSFER': return '💸';
-    case 'BUY_ASSET': return '🏠';
-    case 'PAY_COST': return '🏦';
-    case 'DONATE': return '🤝';
-    case 'SALARY': return '💵';
-    case 'WELFARE_RECEIVE': return '🎁';
-    case 'BANK_RECEIVE': return '🎰';
-    case 'SELL_ASSET': return '📤';
-    default: return '📋';
+const getTransactionIcon = (type: TransactionType): string => {
+  return TRANSACTION_ICONS[type] || '📋';
+};
+
+// T009: 거래 상세 정보 생성 함수
+const getTransactionDetail = (
+  tx: Transaction,
+  getPlayerName: (id: string) => string
+): string | null => {
+  switch (tx.type) {
+    case 'TRANSFER':
+      return `${getPlayerName(tx.fromId)} → ${getPlayerName(tx.toId)}`;
+    case 'BUY_ASSET':
+      if (tx.description) {
+        // description에 자산 정보가 포함됨
+        return tx.description;
+      }
+      return null;
+    case 'SELL_ASSET':
+      if (tx.soldAsset) {
+        const assetType = tx.soldAsset.assetName?.includes('별장') ? '별장' :
+                         tx.soldAsset.assetName?.includes('호텔') ? '호텔' :
+                         tx.soldAsset.assetName?.includes('빌딩') ? '빌딩' : '토지';
+        return `${tx.soldAsset.assetName} (${assetType}) - 원가: ${formatManwon(tx.soldAsset.originalValue)}`;
+      }
+      return tx.description || null;
+    case 'BANK_RECEIVE':
+      if (tx.reason) {
+        const reasonLabels: Record<string, string> = {
+          LOTTERY: '복권 당첨',
+          PRIZE: '우승 상금',
+          BONUS: '보너스',
+          OTHER: tx.description || '기타',
+        };
+        return reasonLabels[tx.reason] || tx.reason;
+      }
+      return tx.description || null;
+    case 'PAY_COST':
+    case 'DONATE':
+    case 'SALARY':
+    case 'WELFARE_RECEIVE':
+      return tx.description || null;
+    default:
+      return tx.description || null;
   }
 };
 
@@ -79,7 +102,7 @@ export const TransactionHistory: React.FC<Props> = ({
            <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
           {transactions.length === 0 ? (
             // T027: 빈 거래 내역 시 안내 메시지
             <div className="text-center text-slate-500 py-8">
@@ -89,12 +112,13 @@ export const TransactionHistory: React.FC<Props> = ({
           ) : (
             transactions.map((tx) => {
               const received = isReceived(tx);
+              const detail = getTransactionDetail(tx, getPlayerName);
               return (
-                <div 
+                <div
                   key={tx.id}
                   className={`p-3 rounded-xl border ${
-                    received 
-                      ? 'bg-green-900/20 border-green-500/30' 
+                    received
+                      ? 'bg-green-900/20 border-green-500/30'
                       : 'bg-slate-800/50 border-slate-700'
                   }`}
                 >
@@ -107,9 +131,9 @@ export const TransactionHistory: React.FC<Props> = ({
                         </div>
                         <div className="text-xs text-slate-500">
                           {received ? (
-                            <span>From: {getPlayerName(tx.fromId)}</span>
+                            <span>보낸 사람: {getPlayerName(tx.fromId)}</span>
                           ) : (
-                            <span>To: {getPlayerName(tx.toId)}</span>
+                            <span>받는 사람: {getPlayerName(tx.toId)}</span>
                           )}
                         </div>
                       </div>
@@ -123,9 +147,9 @@ export const TransactionHistory: React.FC<Props> = ({
                       </div>
                     </div>
                   </div>
-                  {tx.description && (
+                  {detail && (
                     <div className="mt-2 text-xs text-slate-400 bg-slate-900/50 p-2 rounded-lg">
-                      {tx.description}
+                      {detail}
                     </div>
                   )}
                 </div>

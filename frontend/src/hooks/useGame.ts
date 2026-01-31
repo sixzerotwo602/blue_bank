@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from './useSocket';
-import type { Room, Vote, Transaction, ConnectionStatusPayload, HostMigratingPayload, HostMigratedPayload, PlayerKickedPayload } from '@blue-banker/shared';
+import type { Room, Vote, Transaction, ConnectionStatusPayload, HostMigratingPayload, HostMigratedPayload, PlayerKickedPayload, Notification } from '@blue-banker/shared';
 import toast from 'react-hot-toast';
 import useSound from 'use-sound';
 
@@ -162,6 +162,34 @@ export const useGame = (roomId?: string) => {
         }
     };
 
+    // T017: notification:received 이벤트 핸들러 (송금 수신 등)
+    const onNotificationReceived = (notification: Notification) => {
+        switch (notification.type) {
+            case 'TRANSFER_RECEIVED':
+                toast.success(notification.message, { icon: '💸' });
+                playSuccess();
+                break;
+            case 'BANK_RECEIVED':
+                toast.success(notification.message, { icon: '🏦' });
+                playSuccess();
+                break;
+            case 'VOTE_STARTED':
+                toast(notification.message, { icon: '🗳️' });
+                break;
+            case 'VOTE_ENDED':
+                toast(notification.message, { icon: '✅' });
+                break;
+            case 'GAME_END_REQUESTED':
+                toast(notification.message, { icon: '🚨', duration: 5000 });
+                break;
+            case 'GAME_ENDED':
+                toast(notification.message, { icon: '🏁' });
+                break;
+            default:
+                toast(notification.message);
+        }
+    };
+
     socket.on('room:sync', onSync);
     socket.on('game:started', onGameStarted);
     socket.on('game:ended', onGameEnded);
@@ -183,6 +211,9 @@ export const useGame = (roomId?: string) => {
     socket.on('game_end_vote:updated', onGameEndVoteUpdated);
     // @ts-ignore
     socket.on('game_end_vote:ended', onGameEndVoteEnded);
+    // T017: Notification events
+    // @ts-ignore
+    socket.on('notification:received', onNotificationReceived);
 
     // Initial Fetch if room is missing (e.g. refresh or quick nav)
     if (roomId && !room) {
@@ -217,6 +248,8 @@ export const useGame = (roomId?: string) => {
       socket.off('game_end_vote:updated', onGameEndVoteUpdated);
       // @ts-ignore
       socket.off('game_end_vote:ended', onGameEndVoteEnded);
+      // @ts-ignore
+      socket.off('notification:received', onNotificationReceived);
     };
   }, [socket, roomId, navigate, playSuccess, playError]);
 
@@ -297,14 +330,15 @@ export const useGame = (roomId?: string) => {
     // localStorage.removeItem(`blue-banker-nickname-${roomId}`);
   }, [socket, roomId]);
 
-  const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING', buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA') => {
+  // T028: 토지명/토지ID/별장갯수 추가
+  const requestTransaction = useCallback((type: string, amount: number, toId?: string, assetType?: 'LAND' | 'BUILDING', buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA', landName?: string, selectedLandId?: string, villaCount?: number) => {
     return new Promise<boolean>((resolve) => {
         if (!socket) {
             resolve(false);
             return;
         }
         // @ts-ignore Shared type update might not be reflected in frontend dev server yet without restart
-        socket.emit('tx:request', { type, amount, toId, assetType, buildingType }, (res: any) => {
+        socket.emit('tx:request', { type, amount, toId, assetType, buildingType, landName, selectedLandId, villaCount }, (res: any) => {
             if (!res.success) {
                 toast.error(res.error || '거래 실패');
                 playError();
@@ -439,6 +473,28 @@ export const useGame = (roomId?: string) => {
       });
   }, [socket, playError]);
 
+  // T049: 게임 종료 투표 취소
+  const cancelGameEndVote = useCallback((voteId: string) => {
+      return new Promise<boolean>((resolve) => {
+          if (!socket) {
+              resolve(false);
+              return;
+          }
+          // @ts-ignore
+          socket.emit('game_end_vote:cancel', voteId, (res: any) => {
+              if (!res.success) {
+                  toast.error(res.error || '투표 취소 실패');
+                  playError();
+                  resolve(false);
+              } else {
+                  toast.success('투표가 취소되었습니다');
+                  setGameEndVote(null);
+                  resolve(true);
+              }
+          });
+      });
+  }, [socket, playError]);
+
   return {
     room,
     error,
@@ -458,7 +514,8 @@ export const useGame = (roomId?: string) => {
     bankReceive,
     sellAsset,
     requestGameEnd,  // T062
-    castGameEndVote  // T062
+    castGameEndVote,  // T062
+    cancelGameEndVote  // T049
   };
 };
 
