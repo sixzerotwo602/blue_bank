@@ -1,0 +1,7 @@
+{
+  "shadow": {
+    "lg": { "value": "0 10px 15px -3px rgb(0 0 0 / 0.1)" },
+    "xl": { "value": "0 20px 25px -5px rgb(0 0 0 / 0.1)" },
+    "blue": { "value": "0 10px 30px -10px rgba(37, 99, 235, 0.2)" }
+  }
+}

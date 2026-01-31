@@ -1,0 +1,134 @@
+{
+  "blue-banker-tokens": {
+    "color": {
+      "primary": {
+        "500": {
+          "value": "#3b82f6",
+          "type": "color"
+        },
+        "600": {
+          "value": "#2563eb",
+          "type": "color"
+        }
+      },
+      "slate": {
+        "700": {
+          "value": "#334155",
+          "type": "color"
+        },
+        "800": {
+          "value": "#1e293b",
+          "type": "color"
+        },
+        "900": {
+          "value": "#0f172a",
+          "type": "color"
+        },
+        "950": {
+          "value": "#020617",
+          "type": "color"
+        }
+      },
+      "success": {
+        "value": "#10b981",
+        "type": "color"
+      },
+      "danger": {
+        "value": "#dc2626",
+        "type": "color"
+      },
+      "warning": {
+        "value": "#eab308",
+        "type": "color"
+      }
+    },
+    "spacing": {
+      "2": {
+        "value": "8",
+        "type": "spacing"
+      },
+      "3": {
+        "value": "12",
+        "type": "spacing"
+      },
+      "4": {
+        "value": "16",
+        "type": "spacing"
+      },
+      "6": {
+        "value": "24",
+        "type": "spacing"
+      },
+      "8": {
+        "value": "32",
+        "type": "spacing"
+      }
+    },
+    "radius": {
+      "lg": {
+        "value": "8",
+        "type": "borderRadius"
+      },
+      "xl": {
+        "value": "12",
+        "type": "borderRadius"
+      },
+      "2xl": {
+        "value": "16",
+        "type": "borderRadius"
+      },
+      "full": {
+        "value": "9999",
+        "type": "borderRadius"
+      }
+    },
+    "shadow": {
+      "lg": {
+        "value": "0px 10px 15px -3px rgba(0, 0, 0, 0.1)",
+        "type": "boxShadow"
+      },
+      "xl": {
+        "value": "0px 20px 25px -5px rgba(0, 0, 0, 0.1)",
+        "type": "boxShadow"
+      },
+      "blue": {
+        "value": "0px 10px 30px -10px rgba(37, 99, 235, 0.2)",
+        "type": "boxShadow"
+      }
+    },
+    "font": {
+      "size": {
+        "xs": {
+          "value": "12",
+          "type": "fontSize"
+        },
+        "sm": {
+          "value": "14",
+          "type": "fontSize"
+        },
+        "base": {
+          "value": "16",
+          "type": "fontSize"
+        },
+        "lg": {
+          "value": "18",
+          "type": "fontSize"
+        },
+        "xl": {
+          "value": "20",
+          "type": "fontSize"
+        }
+      },
+      "weight": {
+        "medium": {
+          "value": "500",
+          "type": "fontWeight"
+        },
+        "bold": {
+          "value": "700",
+          "type": "fontWeight"
+        }
+      }
+    }
+  }
+}

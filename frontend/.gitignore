@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Design system auto-generated files
+src/design-system/theme/tokens.js
+src/design-system/theme/tokens.d.ts
+src/design-system/theme/tokens.css
+
+# Figma tokens (optional - commit if you want to track them)
+# tokens-figma.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

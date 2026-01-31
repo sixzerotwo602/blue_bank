@@ -1,0 +1,17 @@
+{
+  "color": {
+    "primary": {
+      "500": { "value": "#3b82f6" },
+      "600": { "value": "#2563eb" }
+    },
+    "slate": {
+      "700": { "value": "#334155" },
+      "800": { "value": "#1e293b" },
+      "900": { "value": "#0f172a" },
+      "950": { "value": "#020617" }
+    },
+    "success": { "value": "#10b981" },
+    "danger": { "value": "#dc2626" },
+    "warning": { "value": "#eab308" }
+  }
+}

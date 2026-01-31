@@ -1,0 +1,15 @@
+{
+  "font": {
+    "size": {
+      "xs": { "value": "0.75rem" },
+      "sm": { "value": "0.875rem" },
+      "base": { "value": "1rem" },
+      "lg": { "value": "1.125rem" },
+      "xl": { "value": "1.25rem" }
+    },
+    "weight": {
+      "medium": { "value": "500" },
+      "bold": { "value": "700" }
+    }
+  }
+}
