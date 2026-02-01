@@ -10,8 +10,18 @@ import toast from 'react-hot-toast';
 export const Lobby: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const { room, startGame } = useGame(roomId);
-  const { socket } = useSocket(); 
-  const customInputRef = React.useRef<HTMLInputElement>(null);
+  const { socket } = useSocket();
+  const [customAmount, setCustomAmount] = React.useState('');
+
+  // T041: 100조 제한 적용 (TransactionModal과 동일한 방식)
+  const formatInput = (val: string) => {
+    const num = val.replace(/[^0-9]/g, '');
+    if (!num) return '';
+    const parsed = parseInt(num, 10);
+    // MAX_AMOUNT (100조)를 초과하지 않도록 제한
+    const limited = Math.min(parsed, MAX_AMOUNT);
+    return limited.toLocaleString('ko-KR');
+  };
 
   if (!room) {
      return (
@@ -70,21 +80,18 @@ export const Lobby: React.FC = () => {
                     <p className="text-sm text-slate-400 mb-2">또는 직접 입력 (최대 100조원)</p>
                     <div className="flex gap-2">
                         <input
-                            ref={customInputRef}
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            value={customAmount}
+                            onChange={(e) => setCustomAmount(formatInput(e.target.value))}
                             placeholder="금액(원)"
-                            max={MAX_AMOUNT}
-                            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white w-full focus:outline-none focus:border-blue-500"
+                            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white w-full focus:outline-none focus:border-blue-500 text-right"
                         />
                         <button
                             onClick={() => {
-                                const val = parseInt(customInputRef.current?.value || '0');
-                                if (val <= 0) {
+                                const val = parseInt(customAmount.replace(/[^0-9]/g, ''), 10);
+                                if (!Number.isFinite(val) || val <= 0) {
                                     toast.error('올바른 금액을 입력하세요');
-                                    return;
-                                }
-                                if (val > MAX_AMOUNT) {
-                                    toast.error('금액은 100조 원을 초과할 수 없습니다');
                                     return;
                                 }
                                 startGame(val);
