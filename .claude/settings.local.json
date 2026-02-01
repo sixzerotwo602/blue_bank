@@ -6,7 +6,8 @@
       "Bash(git fetch:*)",
       "Bash(npm run build:shared:*)",
       "Bash(npm run:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(gh issue view:*)"
     ]
   }
 }
