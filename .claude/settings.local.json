@@ -7,7 +7,13 @@
       "Bash(npm run build:shared:*)",
       "Bash(npm run:*)",
       "Bash(node:*)",
-      "Bash(gh issue view:*)"
+      "Bash(gh issue view:*)",
+      "Bash(gh repo view:*)",
+      "Bash(git show:*)",
+      "Bash(gh issue create --title \"fix: RankingList.tsx 미사용 변수\\(toggleFormat\\)로 인한 Cloudflare Pages 빌드 실패\" --body \"$\\(cat <<''EOF''\n## 문제 설명\n\nCloudflare Pages 배포 시 프론트엔드 빌드\\(`tsc -b && vite build`\\)가 다음 TypeScript 에러로 실패합니다:\n\n```\nsrc/components/RankingList.tsx\\(88,22\\): error TS6133: ''toggleFormat'' is declared but its value is never read.\n```\n\n## 원인\n\n`RankingList.tsx`의 88번째 줄에서 `useMoneyFormat\\(\\)` 훅의 반환값 중 `toggleFormat`을 destructuring하고 있으나, 컴포넌트 내에서 실제로 사용하지 않음. TypeScript 컴파일러가 `TS6133` \\(미사용 변수\\) 에러를 발생시켜 빌드가 중단됨.\n\n```typescript\n// 문제 코드\nconst { useManwon, toggleFormat } = useMoneyFormat\\(\\);\n```\n\n## 수정 사항\n\n미사용 변수 `toggleFormat`을 destructuring에서 제거.\n\n```typescript\n// 수정 후\nconst { useManwon } = useMoneyFormat\\(\\);\n```\n\n## 수정 커밋\n\n- `46257e4a18091d3fd281b82a5c572af0a29b6a12`\n\n## 영향 범위\n\n- 파일: `frontend/src/components/RankingList.tsx`\n- 기능적 변경 없음 \\(미사용 변수 제거만 수행\\)\n\n## 라벨\n\n`bug`, `build`\nEOF\n\\)\" --label \"bug\")",
+      "Bash(gh label:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue close 22 --comment \"$\\(cat <<''EOF''\n## 이슈 완료 보고\n\n### 해결 상태: ✅ 완료\n\n### 문제 요약\nCloudflare Pages 배포 빌드에서 `frontend/src/components/RankingList.tsx`의 미사용 변수 `toggleFormat`이 TypeScript `TS6133` 에러를 발생시켜 빌드가 실패함.\n\n### 수정 내용\n- **파일**: `frontend/src/components/RankingList.tsx` \\(88번째 줄\\)\n- **변경**: `useMoneyFormat\\(\\)` 훅의 destructuring에서 미사용 변수 `toggleFormat` 제거\n- **커밋**: [`46257e4`]\\(https://github.com/sixzerotwo602/blue_bank/commit/46257e4a18091d3fd281b82a5c572af0a29b6a12\\)\n\n### 변경 전후 비교\n\n| 항목 | 변경 전 | 변경 후 |\n|------|---------|---------|\n| 코드 | `const { useManwon, toggleFormat } = useMoneyFormat\\(\\);` | `const { useManwon } = useMoneyFormat\\(\\);` |\n| 빌드 | TS6133 에러로 실패 | 정상 통과 |\n\n### 검증 결과\n- `tsc -b` 로컬 빌드 성공 확인\n- 기능적 변경 없음 \\(미사용 변수 제거만 수행\\)\n- 기존 동작에 영향 없음\n\n### 영향 범위\n- 변경 파일 1개, 변경 라인 1줄\n- 런타임 동작 변경 없음\nEOF\n\\)\")"
     ]
   }
 }
