@@ -1,27 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { formatManwon } from '../utils/formatMoney';
+import { useMoneyFormat } from '../contexts/MoneyFormatContext';
 
 interface Props {
   amount: number;
   className?: string;
   showCurrency?: boolean;
-  useManwon?: boolean; // T018-T019: 만원 단위 표시 옵션
-  clickable?: boolean; // T038-T039: 클릭 시 만원↔숫자 토글
+  clickable?: boolean; // 클릭 시 전역 만원↔숫자 토글
 }
 
 export const MoneyDisplay: React.FC<Props> = ({
   amount,
   className = '',
   showCurrency = true,
-  useManwon: initialUseManwon = true,  // 기본값: 만원 단위 사용
-  clickable = false  // T039: 기본값은 클릭 불가
+  clickable = false
 }) => {
-  // T038: 내부 상태로 만원↔숫자 토글 관리
-  const [useManwon, setUseManwon] = useState(initialUseManwon);
+  const { useManwon, toggleFormat } = useMoneyFormat();
 
   const handleClick = () => {
     if (clickable) {
-      setUseManwon(prev => !prev);
+      toggleFormat();
     }
   };
 
@@ -35,19 +33,19 @@ export const MoneyDisplay: React.FC<Props> = ({
       <span
         className={`${baseClass} ${clickableClass}`}
         onClick={handleClick}
-        title={clickable ? '클릭하여 표시 형식 변경' : undefined}
+        title={clickable ? '클릭하여 전체 금액 표시 형식 변경' : undefined}
       >
         {showCurrency ? formatted : formatted.replace(/[만]?원$/, '')}
       </span>
     );
   }
 
-  // 원 단위 표시 (기존 로직)
+  // 원 단위 표시
   return (
     <span
       className={`${baseClass} ${clickableClass}`}
       onClick={handleClick}
-      title={clickable ? '클릭하여 표시 형식 변경' : undefined}
+      title={clickable ? '클릭하여 전체 금액 표시 형식 변경' : undefined}
     >
       {amount?.toLocaleString('ko-KR')}
       {showCurrency && <span className="text-[0.8em] ml-1 opacity-70">원</span>}

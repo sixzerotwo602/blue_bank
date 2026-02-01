@@ -1,7 +1,8 @@
 import React from 'react';
 import type { Transaction, TransactionType } from '@blue-banker/shared';
-import { formatManwon } from '../utils/formatMoney';
 import { TRANSACTION_LABELS, TRANSACTION_ICONS } from '../utils/transactionLabels';
+import { MoneyDisplay } from './MoneyDisplay';
+import { formatManwon } from '../utils/formatMoney';
 
 interface Props {
   isOpen: boolean;
@@ -180,7 +181,7 @@ export const TransactionHistory: React.FC<Props> = ({
                     </div>
                     <div className="text-right">
                       <div className={`font-bold ${received ? 'text-green-400' : 'text-red-400'}`}>
-                        {received ? '+' : '-'}{formatManwon(tx.amount)}
+                        {received ? '+' : '-'}<MoneyDisplay amount={tx.amount} />
                       </div>
                       <div className="text-xs text-slate-600">
                         {formatTime(tx.timestamp)}

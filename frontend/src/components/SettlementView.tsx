@@ -53,9 +53,9 @@ export const SettlementView: React.FC<Props> = ({ rankings, onGoHome }) => {
                      </div>
 
                      <div className="text-right">
-                         <div className="text-xs text-slate-500 mb-1">총 자산</div>
+                         <div className="text-xs text-slate-500 mb-1">총 자산 <span className="text-slate-600">(클릭: 단위 변경)</span></div>
                          <div className={`font-mono font-bold text-xl ${isWinner ? 'text-yellow-400' : 'text-white'}`}>
-                             <MoneyDisplay amount={p.totalAssets} />
+                             <MoneyDisplay amount={p.totalAssets} clickable />
                          </div>
                      </div>
                  </div>

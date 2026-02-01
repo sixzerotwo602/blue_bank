@@ -4,6 +4,7 @@ import { MoneyDisplay } from './MoneyDisplay';
 import { ConnectionStatus } from './ConnectionStatus';
 import { KickPlayerButton } from './KickPlayerButton';
 import { PlayerAssetModal } from './PlayerAssetModal';
+import { useMoneyFormat } from '../contexts/MoneyFormatContext';
 
 type BuildingType = 'HOTEL' | 'BUILDING' | 'VILLA';
 
@@ -65,11 +66,14 @@ const getBuildingIcon = (type: BuildingType | undefined): string => {
   }
 };
 
-// Format value in 만원 units
-const formatValue = (value: number): string => {
+// Format value - uses global format setting
+const formatValue = (value: number, useManwon: boolean): string => {
   if (value === 0) return '0';
-  const man = Math.floor(value / 10000);
-  return `${man.toLocaleString('ko-KR')}만`;
+  if (useManwon) {
+    const man = Math.floor(value / 10000);
+    return `${man.toLocaleString('ko-KR')}만`;
+  }
+  return value.toLocaleString('ko-KR');
 };
 
 export const RankingList: React.FC<Props> = ({
@@ -81,6 +85,7 @@ export const RankingList: React.FC<Props> = ({
 }) => {
   // T035: 선택된 플레이어 상태
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const { useManwon, toggleFormat } = useMoneyFormat();
 
   const sortedPlayers = [...players].sort((a, b) => {
     const totalA = a.cash + a.assetValue;
@@ -132,16 +137,16 @@ export const RankingList: React.FC<Props> = ({
                              {hasAssets ? (
                                <>
                                  {stats.land.count > 0 && (
-                                   <span title="토지">🏞️ 토지: {stats.land.count}개 ({formatValue(stats.land.value)})</span>
+                                   <span title="토지">🏞️ 토지: {stats.land.count}개 ({formatValue(stats.land.value, useManwon)})</span>
                                  )}
                                  {stats.buildings.hotel.count > 0 && (
-                                   <span title="호텔">{getBuildingIcon('HOTEL')} 호텔: {stats.buildings.hotel.count}개 ({formatValue(stats.buildings.hotel.value)})</span>
+                                   <span title="호텔">{getBuildingIcon('HOTEL')} 호텔: {stats.buildings.hotel.count}개 ({formatValue(stats.buildings.hotel.value, useManwon)})</span>
                                  )}
                                  {stats.buildings.building.count > 0 && (
-                                   <span title="빌딩">{getBuildingIcon('BUILDING')} 빌딩: {stats.buildings.building.count}개 ({formatValue(stats.buildings.building.value)})</span>
+                                   <span title="빌딩">{getBuildingIcon('BUILDING')} 빌딩: {stats.buildings.building.count}개 ({formatValue(stats.buildings.building.value, useManwon)})</span>
                                  )}
                                  {stats.buildings.villa.count > 0 && (
-                                   <span title="별장">{getBuildingIcon('VILLA')} 별장: {stats.buildings.villa.count}개 ({formatValue(stats.buildings.villa.value)})</span>
+                                   <span title="별장">{getBuildingIcon('VILLA')} 별장: {stats.buildings.villa.count}개 ({formatValue(stats.buildings.villa.value, useManwon)})</span>
                                  )}
                                </>
                              ) : (
@@ -162,10 +167,10 @@ export const RankingList: React.FC<Props> = ({
                        )}
                        <div className="text-right">
                           <div className="font-bold text-slate-200">
-                             <MoneyDisplay amount={totalAsset} />
+                             <MoneyDisplay amount={totalAsset} clickable />
                           </div>
                           <div className="text-xs text-slate-500">
-                             총 자산
+                             총 자산 <span className="text-slate-600">(클릭: 단위 변경)</span>
                           </div>
                        </div>
                     </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Player, Asset } from '@blue-banker/shared';
-import { formatManwon } from '../utils/formatMoney';
 import { getAssetDisplayInfo } from '../utils/transactionLabels';
+import { MoneyDisplay } from './MoneyDisplay';
 
 interface Props {
   isOpen: boolean;
@@ -48,18 +48,18 @@ export const PlayerAssetModal: React.FC<Props> = ({
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-800 rounded-xl p-3 text-center">
               <div className="text-xs text-slate-400 mb-1">현금</div>
-              <div className="text-lg font-bold text-green-400">{formatManwon(player.cash)}</div>
+              <div className="text-lg font-bold text-green-400"><MoneyDisplay amount={player.cash} /></div>
             </div>
             <div className="bg-slate-800 rounded-xl p-3 text-center">
               <div className="text-xs text-slate-400 mb-1">부동산 가치</div>
-              <div className="text-lg font-bold text-blue-400">{formatManwon(player.assetValue)}</div>
+              <div className="text-lg font-bold text-blue-400"><MoneyDisplay amount={player.assetValue} /></div>
             </div>
           </div>
 
           {/* 총 자산 */}
           <div className="bg-slate-800/50 rounded-xl p-3 text-center border border-slate-700">
-            <div className="text-xs text-slate-400 mb-1">총 자산</div>
-            <div className="text-xl font-bold text-white">{formatManwon(player.cash + player.assetValue)}</div>
+            <div className="text-xs text-slate-400 mb-1">총 자산 <span className="text-slate-600">(클릭: 단위 변경)</span></div>
+            <div className="text-xl font-bold text-white"><MoneyDisplay amount={player.cash + player.assetValue} clickable /></div>
           </div>
 
           {/* 보유 자산 목록 */}
@@ -84,7 +84,7 @@ export const PlayerAssetModal: React.FC<Props> = ({
                         <div className="font-medium text-white text-sm">{displayInfo.primary}</div>
                         <div className="text-xs text-slate-400">{displayInfo.secondary}</div>
                       </div>
-                      <div className="text-sm font-bold text-blue-300">{formatManwon(asset.value)}</div>
+                      <div className="text-sm font-bold text-blue-300"><MoneyDisplay amount={asset.value} /></div>
                     </div>
                   );
                 })

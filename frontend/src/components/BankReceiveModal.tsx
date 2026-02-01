@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { BankReceiveReason } from '@blue-banker/shared';
-import { formatManwon } from '../utils/formatMoney';
 import { MAX_AMOUNT } from '../utils/constants';
+import { MoneyDisplay } from './MoneyDisplay';
 
 interface Props {
   isOpen: boolean;
@@ -101,7 +101,7 @@ export const BankReceiveModal: React.FC<Props> = ({
             <label className="block text-sm text-slate-400 mb-2">지급 금액</label>
             <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
               <div className="text-2xl font-bold text-amber-400 text-center mb-3">
-                {formatManwon(amount)}
+                <MoneyDisplay amount={amount} />
               </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {[50000, 10000, 5000, 1000].map((val) => (

@@ -24,7 +24,10 @@ export class TransactionService {
     const player = room.players.find(p => p.id === requesterId);
     if (!player) throw new Error('플레이어를 찾을 수 없습니다');
 
-    if (payload.amount <= 0) throw new Error('금액은 0보다 커야 합니다');
+    // SELL_ASSET은 금액을 백엔드에서 계산하므로 검증 제외
+    if (payload.type !== 'SELL_ASSET' && payload.amount <= 0) {
+      throw new Error('금액은 0보다 커야 합니다');
+    }
 
     let fromId: string | 'BANK' | 'FUND' = requesterId;
     let toId: string | 'BANK' | 'FUND' = 'BANK';
@@ -167,19 +170,23 @@ export class TransactionService {
         if (!payload.toId) throw new Error('매각할 자산을 선택해주세요');
         const assetIndex = player.assets.findIndex(a => a.id === payload.toId);
         if (assetIndex === -1) throw new Error('자산을 찾을 수 없습니다');
-        
+
         const asset = player.assets[assetIndex]!;
         const sellPrice = Math.floor(asset.value * 0.5); // 50% 현금화
-        
+
         // 자산 제거
         player.assets.splice(assetIndex, 1);
         player.assetValue -= asset.value;
-        
+
         // 현금 지급
         player.cash += sellPrice;
-        
+
         fromId = player.id;
         toId = 'BANK';
+
+        // 실제 매각 금액으로 payload.amount 업데이트 (거래 기록용)
+        payload.amount = sellPrice;
+        txDescription = `'${asset.name}' 매각 (원가: ${asset.value}원)`;
         break;
       }
 

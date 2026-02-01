@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { SocketProvider } from './services/socketContext';
+import { MoneyFormatProvider } from './contexts/MoneyFormatContext';
 import { Home } from './pages/Home';
 import { Lobby } from './pages/Lobby';
 import { Dashboard } from './pages/Dashboard';
@@ -38,7 +39,9 @@ const AppContent = () => {
 function App() {
   return (
     <SocketProvider>
-      <AppContent />
+      <MoneyFormatProvider>
+        <AppContent />
+      </MoneyFormatProvider>
     </SocketProvider>
   );
 }

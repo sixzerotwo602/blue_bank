@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { Asset } from '@blue-banker/shared';
-import { formatManwon } from '../utils/formatMoney';
 // T029: getAssetDisplayInfo import
 import { getAssetDisplayInfo } from '../utils/transactionLabels';
+import { MoneyDisplay } from './MoneyDisplay';
 
 interface Props {
   isOpen: boolean;
@@ -77,11 +77,11 @@ export const SellAssetModal: React.FC<Props> = ({
               <div className="bg-slate-800 rounded-xl p-4 space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-400">원래 가치</span>
-                  <span className="text-white">{formatManwon(selectedAssetData.value)}</span>
+                  <span className="text-white"><MoneyDisplay amount={selectedAssetData.value} /></span>
                 </div>
                 <div className="flex justify-between border-t border-slate-700 pt-2">
                   <span className="text-slate-300 font-bold">매각 금액 (50%)</span>
-                  <span className="text-red-400 font-bold">{formatManwon(Math.floor(selectedAssetData.value * 0.5))}</span>
+                  <span className="text-red-400 font-bold"><MoneyDisplay amount={Math.floor(selectedAssetData.value * 0.5)} /></span>
                 </div>
               </div>
 
@@ -127,8 +127,8 @@ export const SellAssetModal: React.FC<Props> = ({
                         <div className="text-sm text-slate-400">{displayInfo.secondary}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-slate-400 text-sm line-through">{formatManwon(asset.value)}</div>
-                        <div className="text-red-400 font-bold">{formatManwon(Math.floor(asset.value * 0.5))}</div>
+                        <div className="text-slate-400 text-sm line-through"><MoneyDisplay amount={asset.value} /></div>
+                        <div className="text-red-400 font-bold"><MoneyDisplay amount={Math.floor(asset.value * 0.5)} /></div>
                       </div>
                     </button>
                   );
