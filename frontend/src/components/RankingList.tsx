@@ -85,7 +85,7 @@ export const RankingList: React.FC<Props> = ({
 }) => {
   // T035: 선택된 플레이어 상태
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const { useManwon, toggleFormat } = useMoneyFormat();
+  const { useManwon } = useMoneyFormat();
 
   const sortedPlayers = [...players].sort((a, b) => {
     const totalA = a.cash + a.assetValue;
