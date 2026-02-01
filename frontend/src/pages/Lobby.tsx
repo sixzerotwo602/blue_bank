@@ -4,6 +4,8 @@ import { useGame } from '../hooks/useGame';
 import { useSocket } from '../hooks/useSocket'; // Still need useSocket for socket.id check (or expose myId from useGame)
 import type { Player } from '@blue-banker/shared';
 import { ConnectionStatus } from '../components/ConnectionStatus';
+import { MAX_AMOUNT } from '../utils/constants';
+import toast from 'react-hot-toast';
 
 export const Lobby: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -65,19 +67,27 @@ export const Lobby: React.FC = () => {
                     2인 시작 (586만원)
                 </button>
                 <div className="relative border-t border-slate-700 pt-3 mt-3">
-                    <p className="text-sm text-slate-400 mb-2">또는 직접 입력</p>
+                    <p className="text-sm text-slate-400 mb-2">또는 직접 입력 (최대 100조원)</p>
                     <div className="flex gap-2">
-                        <input 
+                        <input
                             ref={customInputRef}
                             type="number"
                             placeholder="금액(원)"
+                            max={MAX_AMOUNT}
                             className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white w-full focus:outline-none focus:border-blue-500"
                         />
                         <button
                             onClick={() => {
                                 const val = parseInt(customInputRef.current?.value || '0');
-                                if(val > 0) startGame(val);
-                                else alert('올바른 금액을 입력하세요');
+                                if (val <= 0) {
+                                    toast.error('올바른 금액을 입력하세요');
+                                    return;
+                                }
+                                if (val > MAX_AMOUNT) {
+                                    toast.error('금액은 100조 원을 초과할 수 없습니다');
+                                    return;
+                                }
+                                startGame(val);
                             }}
                             className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-bold text-white whitespace-nowrap shadow-lg transition-all active:scale-95"
                         >
