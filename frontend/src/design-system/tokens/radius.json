@@ -1,0 +1,8 @@
+{
+  "radius": {
+    "lg": { "value": "0.5rem" },
+    "xl": { "value": "0.75rem" },
+    "2xl": { "value": "1rem" },
+    "full": { "value": "9999px" }
+  }
+}
