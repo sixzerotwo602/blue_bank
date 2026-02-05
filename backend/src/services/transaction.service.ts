@@ -256,13 +256,12 @@ export class TransactionService {
   // 거래 취소 가능 시간 제한 (2분 = 120초 = 120000ms)
   private readonly CANCEL_TIME_LIMIT_MS = 120000;
 
-  // 복지기금 락 조건: 특정 시점 이후 WELFARE_RECEIVE 거래가 있는지 확인
-  private hasWelfarePayoutAfter(timestamp: number): boolean {
+  // 복지기금 락 조건: WELFARE_RECEIVE 거래가 한 번이라도 있는지 확인
+  private hasAnyWelfarePayout(): boolean {
     for (const tx of store.transactions.values()) {
       if (
         tx.type === 'WELFARE_RECEIVE' &&
-        tx.status !== 'CANCELLED' &&
-        tx.timestamp > timestamp
+        tx.status !== 'CANCELLED'
       ) {
         return true;
       }
@@ -291,11 +290,32 @@ export class TransactionService {
     if (!room) return { error: '방을 찾을 수 없습니다' };
 
     // 복지기금 기부(DONATE to FUND) 락 조건 검증
-    // 기부 이후 단 한 번이라도 수령(WELFARE_RECEIVE)이 발생했다면 취소 불가
+    // 수령(WELFARE_RECEIVE)이 한 번이라도 발생했다면 모든 기부 취소 불가
     if (transaction.type === 'DONATE' && transaction.toId === 'FUND') {
-      const hasPayoutAfterDonation = this.hasWelfarePayoutAfter(transaction.timestamp);
-      if (hasPayoutAfterDonation) {
+      if (this.hasAnyWelfarePayout()) {
         return { error: '이미 사용된 기부금은 취소할 수 없습니다 (복지기금 수령 발생)' };
+      }
+    }
+
+    // BUY_ASSET 취소 시 토지 위에 건물이 있으면 취소 불가
+    if (transaction.type === 'BUY_ASSET') {
+      const player = room.players.find(p => p.id === requesterId);
+      if (player) {
+        // 해당 거래로 생성된 자산 찾기
+        const asset = player.assets.find(
+          a => a.value === transaction.amount &&
+               Math.abs(a.createdAt - transaction.timestamp) < 5000
+        );
+
+        // 토지인 경우, 그 위에 건물이 있는지 확인
+        if (asset && asset.type === 'LAND') {
+          const hasBuilding = player.assets.some(
+            a => a.type === 'BUILDING' && a.landId === asset.id
+          );
+          if (hasBuilding) {
+            return { error: '토지 위에 건물이 있어 취소할 수 없습니다. 건물을 먼저 매각해주세요.' };
+          }
+        }
       }
     }
 
@@ -367,6 +387,21 @@ export class TransactionService {
     const fromPlayer = room.players.find(p => p.id === transaction.fromId);
     if (fromPlayer) {
       fromPlayer.cash += transaction.amount;
+
+      // BUY_ASSET 취소 시 자산 반납
+      if (transaction.type === 'BUY_ASSET') {
+        // 해당 금액과 시간에 맞는 자산 찾기 (description에서 자산명 추출)
+        const assetToRemove = fromPlayer.assets.find(
+          a => a.value === transaction.amount &&
+               Math.abs(a.createdAt - transaction.timestamp) < 5000 // 5초 이내 생성된 자산
+        );
+
+        if (assetToRemove) {
+          // 자산 제거
+          fromPlayer.assets = fromPlayer.assets.filter(a => a.id !== assetToRemove.id);
+          fromPlayer.assetValue -= assetToRemove.value;
+        }
+      }
     }
 
     // 수신자로부터 차감 (플레이어인 경우만)

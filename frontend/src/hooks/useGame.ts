@@ -62,11 +62,15 @@ export const useGame = (roomId?: string) => {
     };
     const onVoteUpdated = (vote: Vote) => setActiveVote(vote);
     const onVoteEnded = (vote: Vote) => {
-        setActiveVote(vote); 
+        setActiveVote(vote);
         const result = vote.status === 'APPROVED' ? '승인됨' : '부결됨';
         if (vote.status === 'APPROVED') {
             toast.success(`투표 ${result}!`);
             playSuccess();
+            // 복지기금 투표 승인 시 거래 내역 갱신 (락 상태 업데이트)
+            if (vote.type === 'WELFARE_FUND' && transactionUpdateCallbackRef.current) {
+                transactionUpdateCallbackRef.current();
+            }
         } else {
             toast.error(`투표 ${result}!`);
             playError();

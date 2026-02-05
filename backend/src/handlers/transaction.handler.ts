@@ -210,6 +210,10 @@ export const registerTransactionHandlers = (
         }, 60000);
       } else {
         // 은행/복지기금 거래는 즉시 취소 완료
+        const transaction = transactionService.getTransaction(transactionId);
+        if (transaction) {
+          io.to(roomId).emit('tx:cancelled', transaction);
+        }
         const room = store.rooms.get(roomId);
         if (room) {
           io.to(roomId).emit('room:sync', room);

@@ -28,21 +28,17 @@ class Store {
   // T011: 플레이어별 거래 내역 조회
   // 복지기금 기부 락 상태 포함
   getPlayerTransactions(playerId: string): Transaction[] {
-    // 복지기금 수령 거래 중 가장 빠른 시점 찾기
-    const welfareReceives = Array.from(this.transactions.values())
-      .filter(tx => tx.type === 'WELFARE_RECEIVE' && tx.status !== 'CANCELLED');
-    const earliestPayoutTime = welfareReceives.length > 0
-      ? Math.min(...welfareReceives.map(tx => tx.timestamp))
-      : null;
+    // 복지기금 수령이 한 번이라도 발생했는지 확인
+    const hasWelfareReceive = Array.from(this.transactions.values())
+      .some(tx => tx.type === 'WELFARE_RECEIVE' && tx.status !== 'CANCELLED');
 
     return Array.from(this.transactions.values())
       .filter(tx => tx.fromId === playerId || tx.toId === playerId)
       .map(tx => {
         // 복지기금 기부(DONATE to FUND) 락 상태 계산
-        // 기부 이후 수령 거래가 있으면 락
+        // 수령이 한 번이라도 발생했으면 모든 기부 락
         if (tx.type === 'DONATE' && tx.toId === 'FUND' && tx.status !== 'CANCELLED') {
-          const isLocked = earliestPayoutTime !== null && tx.timestamp < earliestPayoutTime;
-          return { ...tx, locked: isLocked };
+          return { ...tx, locked: hasWelfareReceive };
         }
         return tx;
       })
