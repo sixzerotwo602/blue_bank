@@ -121,6 +121,8 @@ export interface Transaction {
   // NEW: 취소 관련 정보
   cancelledAt?: number;
   cancelledBy?: string;
+  // NEW: 복지기금 기부 락 상태 (수령 발생 후 취소 불가)
+  locked?: boolean;
 }
 
 // NEW: 거래 취소 요청 인터페이스

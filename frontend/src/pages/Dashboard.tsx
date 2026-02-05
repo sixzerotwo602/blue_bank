@@ -318,7 +318,6 @@ export const Dashboard: React.FC = () => {
           currentUserId={socket?.id}
           players={room.players}
           onRequestCancel={requestCancelTransaction}
-          welfareFund={room.welfareFund}
         />
         
         {/* Task 5.3: 은행 수령 모달 - 투표 시스템으로 전환 */}

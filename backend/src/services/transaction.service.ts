@@ -253,9 +253,26 @@ export class TransactionService {
     return store.transactions.get(transactionId);
   }
 
+  // 거래 취소 가능 시간 제한 (2분 = 120초 = 120000ms)
+  private readonly CANCEL_TIME_LIMIT_MS = 120000;
+
+  // 복지기금 락 조건: 특정 시점 이후 WELFARE_RECEIVE 거래가 있는지 확인
+  private hasWelfarePayoutAfter(timestamp: number): boolean {
+    for (const tx of store.transactions.values()) {
+      if (
+        tx.type === 'WELFARE_RECEIVE' &&
+        tx.status !== 'CANCELLED' &&
+        tx.timestamp > timestamp
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Task 6.1: 거래 취소 요청
-  // 취소 가능한 거래 유형: TRANSFER, DONATE, PAY_COST만 허용
-  // 취소 불가: BUY_ASSET, SELL_ASSET, SALARY, WELFARE_RECEIVE, BANK_RECEIVE
+  // 시간 제한: 거래 발생 후 2분 이내만 취소 가능
+  // 복지기금 락 조건: 기부 이후 수령 거래가 있으면 취소 불가
   requestCancelTransaction(roomId: string, transactionId: string, requesterId: string): CancelRequest | { error: string } {
     const transaction = this.getTransaction(transactionId);
 
@@ -264,63 +281,48 @@ export class TransactionService {
     if (transaction.fromId !== requesterId) return { error: '본인의 거래만 취소할 수 있습니다' };
     if (transaction.status === 'CANCELLED') return { error: '이미 취소된 거래입니다' };
 
-    // 취소 가능한 거래 유형 검증
-    const cancellableTypes: TransactionType[] = ['TRANSFER', 'DONATE', 'PAY_COST'];
-    if (!cancellableTypes.includes(transaction.type)) {
-      const typeLabels: Record<string, string> = {
-        'BUY_ASSET': '자산 매입',
-        'SELL_ASSET': '자산 매각',
-        'SALARY': '월급 수령',
-        'WELFARE_RECEIVE': '복지기금 수령',
-        'BANK_RECEIVE': '은행 수령'
-      };
-      const label = typeLabels[transaction.type] || transaction.type;
-      return { error: `${label} 거래는 취소할 수 없습니다` };
+    // 시간 제한 검증: 거래 발생 후 2분 이내만 취소 가능
+    const elapsed = Date.now() - transaction.timestamp;
+    if (elapsed > this.CANCEL_TIME_LIMIT_MS) {
+      return { error: '거래 취소 가능 시간이 만료되었습니다 (2분 초과)' };
     }
 
     const room = store.rooms.get(roomId);
     if (!room) return { error: '방을 찾을 수 없습니다' };
 
-    // 복지기금 거래 취소 시 잔액 확인
-    if (transaction.toId === 'FUND') {
-      if (room.welfareFund < transaction.amount) {
-        return { error: '복지기금 잔액이 부족하여 취소할 수 없습니다' };
+    // 복지기금 기부(DONATE to FUND) 락 조건 검증
+    // 기부 이후 단 한 번이라도 수령(WELFARE_RECEIVE)이 발생했다면 취소 불가
+    if (transaction.type === 'DONATE' && transaction.toId === 'FUND') {
+      const hasPayoutAfterDonation = this.hasWelfarePayoutAfter(transaction.timestamp);
+      if (hasPayoutAfterDonation) {
+        return { error: '이미 사용된 기부금은 취소할 수 없습니다 (복지기금 수령 발생)' };
       }
-      // 복지기금 잔액 충분하면 즉시 취소
+    }
+
+    // 은행/복지기금 거래는 즉시 취소
+    if (transaction.toId === 'BANK' || transaction.toId === 'FUND') {
       const result = this.cancelTransaction(roomId, transactionId, requesterId);
       if ('error' in result) return result;
       return {
         id: randomUUID(),
         transactionId,
         requesterId,
-        targetId: 'FUND',
+        targetId: transaction.toId,
         status: 'APPROVED',
         createdAt: Date.now(),
         expiresAt: Date.now()
       } as CancelRequest;
     }
 
-    // 은행 거래는 즉시 취소 (은행은 무한 자원)
-    if (transaction.toId === 'BANK') {
-      const result = this.cancelTransaction(roomId, transactionId, requesterId);
-      if ('error' in result) return result;
-      return {
-        id: randomUUID(),
-        transactionId,
-        requesterId,
-        targetId: 'BANK',
-        status: 'APPROVED',
-        createdAt: Date.now(),
-        expiresAt: Date.now()
-      } as CancelRequest;
-    }
-
-    // 플레이어 간 거래: 상대방 잔액 확인
+    // 플레이어 간 거래: 상대방 동의 필요
     const targetPlayer = room.players.find(p => p.id === transaction.toId);
     if (!targetPlayer) return { error: '상대방을 찾을 수 없습니다' };
-    if (targetPlayer.cash < transaction.amount) return { error: '상대방의 잔액이 부족합니다' };
 
-    // 취소 요청 생성 (상대방 동의 필요)
+    // 취소 요청 생성 (상대방 동의 필요, 60초 대기)
+    // 단, 거래 취소 가능 시간 내에 완료되어야 함
+    const remainingTime = this.CANCEL_TIME_LIMIT_MS - elapsed;
+    const expiresIn = Math.min(60000, remainingTime); // 60초 또는 남은 시간 중 짧은 것
+
     const request: CancelRequest = {
       id: randomUUID(),
       transactionId,
@@ -328,7 +330,7 @@ export class TransactionService {
       targetId: transaction.toId as string,
       status: 'PENDING',
       createdAt: Date.now(),
-      expiresAt: Date.now() + 60000
+      expiresAt: Date.now() + expiresIn
     };
     store.cancelRequests.set(request.id, request);
     return request;

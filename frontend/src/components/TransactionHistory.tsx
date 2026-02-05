@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Transaction, TransactionType } from '@blue-banker/shared';
 import { TRANSACTION_LABELS, TRANSACTION_ICONS } from '../utils/transactionLabels';
 import { MoneyDisplay } from './MoneyDisplay';
 import { formatManwon } from '../utils/formatMoney';
+
+// 거래 취소 가능 시간 제한 (2분 = 120초)
+const CANCEL_TIME_LIMIT_SEC = 120;
 
 interface Props {
   isOpen: boolean;
@@ -11,7 +14,6 @@ interface Props {
   currentUserId?: string;
   players: { id: string; nickname: string; cash?: number }[];
   onRequestCancel?: (transactionId: string) => void;
-  welfareFund?: number; // 복지기금 잔액 (취소 가능 여부 판단용)
 }
 
 // T007-T008: transactionLabels.ts에서 가져온 상수 사용
@@ -112,9 +114,17 @@ export const TransactionHistory: React.FC<Props> = ({
   transactions,
   currentUserId,
   players,
-  onRequestCancel,
-  welfareFund = 0
+  onRequestCancel
 }) => {
+  // 실시간 카운트다운을 위한 현재 시간 상태 (1초마다 갱신)
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const getPlayerName = (id: string): string => {
@@ -160,37 +170,17 @@ export const TransactionHistory: React.FC<Props> = ({
               const detail = getTransactionDetail(tx, getPlayerName);
               const isCancelled = tx.status === 'CANCELLED';
 
-              // 취소 가능 조건: 내가 보낸 거래, 아직 취소 안됨, 취소 가능한 거래 유형만
-              // 취소 가능: TRANSFER, DONATE, PAY_COST
-              // 취소 불가: BUY_ASSET, SELL_ASSET, SALARY, WELFARE_RECEIVE, BANK_RECEIVE
-              const cancellableTypes: TransactionType[] = ['TRANSFER', 'DONATE', 'PAY_COST'];
-              const canCancel = !received
-                && !isCancelled
-                && tx.fromId === currentUserId
-                && onRequestCancel
-                && cancellableTypes.includes(tx.type);
+              // 취소 가능 시간 계산 (2분 = 120초)
+              const elapsedSec = Math.floor((now - tx.timestamp) / 1000);
+              const remainingSec = Math.max(0, CANCEL_TIME_LIMIT_SEC - elapsedSec);
+              const isTimeExpired = remainingSec <= 0;
 
-              // 잔액 확인: 플레이어/복지기금 모두 체크
-              const targetPlayer = players.find(p => p.id === tx.toId);
-              let targetHasEnoughBalance = true;
-              let insufficientReason = '';
-
-              if (tx.toId === 'FUND') {
-                // 복지기금 잔액 확인
-                targetHasEnoughBalance = welfareFund >= tx.amount;
-                if (!targetHasEnoughBalance) {
-                  insufficientReason = '복지기금 잔액 부족';
-                }
-              } else if (tx.toId === 'BANK') {
-                // 은행은 무한 자원
-                targetHasEnoughBalance = true;
-              } else {
-                // 플레이어 잔액 확인
-                targetHasEnoughBalance = (targetPlayer?.cash ?? 0) >= tx.amount;
-                if (!targetHasEnoughBalance) {
-                  insufficientReason = '상대방 잔액 부족';
-                }
-              }
+              // 남은 시간 포맷팅 (mm:ss)
+              const formatRemainingTime = (sec: number): string => {
+                const min = Math.floor(sec / 60);
+                const s = sec % 60;
+                return `${min}:${s.toString().padStart(2, '0')}`;
+              };
 
               return (
                 <div
@@ -236,21 +226,30 @@ export const TransactionHistory: React.FC<Props> = ({
                       {detail}
                     </div>
                   )}
-                  {/* 취소 버튼 */}
-                  {canCancel && (
+                  {/* 취소 버튼 및 카운트다운 */}
+                  {!received && !isCancelled && tx.fromId === currentUserId && onRequestCancel && (
                     <div className="mt-2 pt-2 border-t border-slate-700/50">
-                      <button
-                        onClick={() => onRequestCancel(tx.id)}
-                        disabled={!targetHasEnoughBalance}
-                        className={`w-full text-xs py-2 rounded-lg font-medium transition-colors ${
-                          targetHasEnoughBalance
-                            ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-500/30'
-                            : 'bg-slate-700/30 text-slate-500 cursor-not-allowed border border-slate-600/30'
-                        }`}
-                        title={!targetHasEnoughBalance ? insufficientReason : ''}
-                      >
-                        {targetHasEnoughBalance ? '거래 취소 요청' : `취소 불가 (${insufficientReason})`}
-                      </button>
+                      {tx.locked ? (
+                        // 복지기금 기부 락 상태: 수령 발생으로 취소 불가
+                        <div className="text-xs text-amber-500 text-center py-1 flex items-center justify-center gap-1">
+                          <span>🔒</span>
+                          <span>사용된 기부금 (취소 불가)</span>
+                        </div>
+                      ) : isTimeExpired ? (
+                        <div className="text-xs text-slate-500 text-center py-1">
+                          취소 가능 시간 만료
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => onRequestCancel(tx.id)}
+                          className="w-full text-xs py-2 rounded-lg font-medium transition-colors bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-500/30 flex items-center justify-center gap-2"
+                        >
+                          <span>거래 취소 요청</span>
+                          <span className={`font-mono px-1.5 py-0.5 rounded ${remainingSec <= 30 ? 'bg-red-500/30 text-red-300 animate-pulse' : 'bg-slate-700/50 text-slate-300'}`}>
+                            {formatRemainingTime(remainingSec)}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
