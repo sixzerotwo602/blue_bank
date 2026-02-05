@@ -1,4 +1,4 @@
-import type { Vote, VoteStatus, GameEndVote } from '@blue-banker/shared';
+import type { Vote, VoteStatus, GameEndVote, BankReceiveReason } from '@blue-banker/shared';
 import { store } from '../models/store.js';
 import { randomUUID } from 'crypto';
 import { transactionService } from './transaction.service.js';
@@ -89,19 +89,97 @@ export class VoteService {
 
   private finalizeVote(vote: Vote, status: VoteStatus) {
     vote.status = status;
-    
+
+    // 타임아웃 타이머 정리
+    const timeoutId = store.voteTimeouts.get(vote.id);
+    if (timeoutId) {
+        clearTimeout(timeoutId);
+        store.voteTimeouts.delete(vote.id);
+    }
+
     if (status === 'APPROVED') {
-        // Execute transaction
-        try {
-            transactionService.processTransaction(vote.roomId, vote.requesterId, {
-                type: 'WELFARE_RECEIVE',
-                amount: vote.amount
-            });
-        } catch (e) {
-            console.error('Failed to process welfare transaction', e);
-            // Ideally revert vote status or mark error, but for MVP just log
+        // Task 5.1: 투표 유형에 따라 분기 처리
+        if (vote.voteType === 'BANK_RECEIVE') {
+            // 은행 수령 투표 승인
+            try {
+                transactionService.processTransaction(vote.roomId, vote.requesterId, {
+                    type: 'BANK_RECEIVE',
+                    amount: vote.amount,
+                    reason: vote.reason as string
+                });
+            } catch (e) {
+                console.error('Failed to process bank receive transaction', e);
+            }
+        } else {
+            // 기존 복지기금 투표 처리
+            try {
+                transactionService.processTransaction(vote.roomId, vote.requesterId, {
+                    type: 'WELFARE_RECEIVE',
+                    amount: vote.amount
+                });
+            } catch (e) {
+                console.error('Failed to process welfare transaction', e);
+            }
         }
     }
+  }
+
+  // FR-023: 사회복지기금 투표 타임아웃 처리 (미응답 = 거절)
+  processWelfareVoteTimeout(voteId: string): Vote | null {
+    const vote = store.votes.get(voteId);
+    if (!vote || vote.status !== 'IN_PROGRESS') return null;
+
+    const room = store.rooms.get(vote.roomId);
+    if (!room) return null;
+
+    // FR-023: 미응답 플레이어는 거절로 처리
+    for (const player of room.players) {
+        if (!(player.id in vote.votes)) {
+            vote.votes[player.id] = false;
+        }
+    }
+
+    this.checkVoteOutcome(vote);
+    return vote;
+  }
+
+  // 진행 중인 투표 조회 (은행 수령 투표용)
+  getActiveVote(roomId: string): Vote | undefined {
+    return Array.from(store.votes.values()).find(
+        v => v.roomId === roomId && v.status === 'IN_PROGRESS'
+    );
+  }
+
+  // Task 5.1: 은행 수령 투표 생성
+  createBankReceiveVote(roomId: string, requesterId: string, amount: number, reason: BankReceiveReason, customReason?: string): Vote {
+    const room = store.rooms.get(roomId);
+    if (!room) throw new Error('방을 찾을 수 없습니다');
+
+    // 이미 진행 중인 투표가 있는지 확인
+    const activeVote = this.getActiveVote(roomId);
+    if (activeVote) {
+        throw new Error('이미 투표가 진행 중입니다');
+    }
+
+    const vote: Vote = {
+      id: randomUUID(),
+      roomId,
+      requesterId,
+      voteType: 'BANK_RECEIVE',
+      amount,
+      status: 'IN_PROGRESS',
+      votes: {},
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60000,
+      timeoutHandledAs: 'REJECT',
+      reason: reason === 'OTHER' ? (customReason || 'OTHER') : reason
+    };
+
+    // 요청자는 자동으로 찬성
+    vote.votes[requesterId] = true;
+
+    store.votes.set(vote.id, vote);
+    return vote;
   }
 
   // T053: 게임 종료 투표 시작
@@ -130,7 +208,7 @@ export class VoteService {
       votes: {},
       createdAt: Date.now(),
       expiresAt: Date.now() + 60000, // T054: 60초 타임아웃
-      timeoutHandledAs: 'APPROVE'
+      timeoutHandledAs: 'REJECT'  // FR-009-1: 미응답 시 거절로 처리 (기존 'APPROVE'에서 변경)
     };
 
     // 호스트는 자동으로 찬성
@@ -157,7 +235,7 @@ export class VoteService {
     return vote;
   }
 
-  // T054: 타임아웃 처리 (미응답=동의)
+  // T054: 타임아웃 처리 (FR-009-1: 미응답=거절로 변경)
   processGameEndVoteTimeout(voteId: string): GameEndVote | null {
     const vote = store.gameEndVotes.get(voteId);
     if (!vote || vote.status !== 'IN_PROGRESS') return null;
@@ -165,10 +243,10 @@ export class VoteService {
     const room = store.rooms.get(vote.roomId);
     if (!room) return null;
 
-    // 미응답 플레이어는 동의로 처리
+    // FR-009-1: 미응답 플레이어는 거절로 처리 (기존 동의에서 변경)
     for (const player of room.players) {
-        if (!(player.id in vote.votes)) {
-            vote.votes[player.id] = true;
+        if (vote.votes[player.id] === undefined || vote.votes[player.id] === null) {
+            vote.votes[player.id] = false;  // REJECT
         }
     }
 
@@ -209,7 +287,7 @@ export class VoteService {
         throw new Error('투표 요청자만 취소할 수 있습니다');
     }
 
-    vote.status = 'REJECTED';
+    vote.status = 'CANCELLED';  // 취소 상태로 변경 (REJECTED → CANCELLED)
     return vote;
   }
 }

@@ -1,4 +1,4 @@
-import type { Transaction, TransactionType, Asset } from '@blue-banker/shared';
+import type { Transaction, TransactionType, Asset, CancelRequest } from '@blue-banker/shared';
 import { store } from '../models/store.js';
 import { randomUUID } from 'crypto';
 
@@ -16,6 +16,7 @@ export class TransactionService {
       selectedLandId?: string; // T022: 건물 매입 시 토지 ID
       villaCount?: number; // T023: 별장 갯수 (1 또는 2)
       reason?: string; // T008: 은행 수령 사유 (BANK_RECEIVE)
+      bundleSell?: boolean; // Task 4.2: 토지+건물 일괄 매각
     }
   ): Transaction {
     const room = store.rooms.get(roomId);
@@ -101,6 +102,10 @@ export class TransactionService {
         if (buildingType) {
             newAsset.buildingType = buildingType;
         }
+        // Task 4.2 fix: 건물 생성 시 landId 연결
+        if (type === 'BUILDING' && payload.selectedLandId) {
+            newAsset.landId = payload.selectedLandId;
+        }
         player.assets.push(newAsset);
 
         fromId = player.id;
@@ -166,17 +171,42 @@ export class TransactionService {
       }
 
       // T044: 자산 매각 (50% 현금화)
+      // Task 4.2: bundleSell 옵션으로 토지+건물 일괄 매각
       case 'SELL_ASSET': {
         if (!payload.toId) throw new Error('매각할 자산을 선택해주세요');
         const assetIndex = player.assets.findIndex(a => a.id === payload.toId);
         if (assetIndex === -1) throw new Error('자산을 찾을 수 없습니다');
 
         const asset = player.assets[assetIndex]!;
-        const sellPrice = Math.floor(asset.value * 0.5); // 50% 현금화
+        let totalValue = asset.value;
+        const soldAssetNames: string[] = [asset.name || '자산'];
 
-        // 자산 제거
-        player.assets.splice(assetIndex, 1);
-        player.assetValue -= asset.value;
+        // Task 4.2: 토지 매각 시 건물 일괄 처리
+        if (asset.type === 'LAND' && payload.bundleSell) {
+          // 토지 위의 모든 건물 찾기
+          const buildingsOnLand = player.assets.filter(
+            a => a.type === 'BUILDING' && a.landId === asset.id
+          );
+
+          // 건물 가치 합산 및 이름 수집
+          for (const building of buildingsOnLand) {
+            totalValue += building.value;
+            soldAssetNames.push(building.name || '건물');
+          }
+
+          // 건물 먼저 제거 (역순으로 제거하여 인덱스 문제 방지)
+          const buildingIds = buildingsOnLand.map(b => b.id);
+          player.assets = player.assets.filter(a => !buildingIds.includes(a.id));
+        }
+
+        const sellPrice = Math.floor(totalValue * 0.5); // 50% 현금화
+
+        // 자산 제거 (토지 또는 단일 자산)
+        const updatedAssetIndex = player.assets.findIndex(a => a.id === payload.toId);
+        if (updatedAssetIndex !== -1) {
+          player.assets.splice(updatedAssetIndex, 1);
+        }
+        player.assetValue -= totalValue;
 
         // 현금 지급
         player.cash += sellPrice;
@@ -186,7 +216,13 @@ export class TransactionService {
 
         // 실제 매각 금액으로 payload.amount 업데이트 (거래 기록용)
         payload.amount = sellPrice;
-        txDescription = `'${asset.name}' 매각 (원가: ${asset.value}원)`;
+
+        // 매각 내역 설명 생성
+        if (soldAssetNames.length > 1) {
+          txDescription = `'${soldAssetNames[0]}' 외 ${soldAssetNames.length - 1}건 일괄 매각 (원가: ${totalValue}원)`;
+        } else {
+          txDescription = `'${asset.name}' 매각 (원가: ${asset.value}원)`;
+        }
         break;
       }
 
@@ -202,12 +238,151 @@ export class TransactionService {
       toId,
       timestamp: Date.now(),
       description: txDescription || payload.type,
+      status: 'COMPLETED', // 기본 상태
       // T008: BANK_RECEIVE인 경우 reason 저장
       ...(payload.type === 'BANK_RECEIVE' && payload.reason ? { reason: payload.reason } : {})
     };
 
     store.transactions.set(transaction.id, transaction);
-    
+
+    return transaction;
+  }
+
+  // Task 6.1: 거래 조회
+  getTransaction(transactionId: string): Transaction | undefined {
+    return store.transactions.get(transactionId);
+  }
+
+  // Task 6.1: 거래 취소 요청
+  // 취소 가능한 거래 유형: TRANSFER, DONATE, PAY_COST만 허용
+  // 취소 불가: BUY_ASSET, SELL_ASSET, SALARY, WELFARE_RECEIVE, BANK_RECEIVE
+  requestCancelTransaction(roomId: string, transactionId: string, requesterId: string): CancelRequest | { error: string } {
+    const transaction = this.getTransaction(transactionId);
+
+    // 기본 검증
+    if (!transaction) return { error: '거래를 찾을 수 없습니다' };
+    if (transaction.fromId !== requesterId) return { error: '본인의 거래만 취소할 수 있습니다' };
+    if (transaction.status === 'CANCELLED') return { error: '이미 취소된 거래입니다' };
+
+    // 취소 가능한 거래 유형 검증
+    const cancellableTypes: TransactionType[] = ['TRANSFER', 'DONATE', 'PAY_COST'];
+    if (!cancellableTypes.includes(transaction.type)) {
+      const typeLabels: Record<string, string> = {
+        'BUY_ASSET': '자산 매입',
+        'SELL_ASSET': '자산 매각',
+        'SALARY': '월급 수령',
+        'WELFARE_RECEIVE': '복지기금 수령',
+        'BANK_RECEIVE': '은행 수령'
+      };
+      const label = typeLabels[transaction.type] || transaction.type;
+      return { error: `${label} 거래는 취소할 수 없습니다` };
+    }
+
+    const room = store.rooms.get(roomId);
+    if (!room) return { error: '방을 찾을 수 없습니다' };
+
+    // 복지기금 거래 취소 시 잔액 확인
+    if (transaction.toId === 'FUND') {
+      if (room.welfareFund < transaction.amount) {
+        return { error: '복지기금 잔액이 부족하여 취소할 수 없습니다' };
+      }
+      // 복지기금 잔액 충분하면 즉시 취소
+      const result = this.cancelTransaction(roomId, transactionId, requesterId);
+      if ('error' in result) return result;
+      return {
+        id: randomUUID(),
+        transactionId,
+        requesterId,
+        targetId: 'FUND',
+        status: 'APPROVED',
+        createdAt: Date.now(),
+        expiresAt: Date.now()
+      } as CancelRequest;
+    }
+
+    // 은행 거래는 즉시 취소 (은행은 무한 자원)
+    if (transaction.toId === 'BANK') {
+      const result = this.cancelTransaction(roomId, transactionId, requesterId);
+      if ('error' in result) return result;
+      return {
+        id: randomUUID(),
+        transactionId,
+        requesterId,
+        targetId: 'BANK',
+        status: 'APPROVED',
+        createdAt: Date.now(),
+        expiresAt: Date.now()
+      } as CancelRequest;
+    }
+
+    // 플레이어 간 거래: 상대방 잔액 확인
+    const targetPlayer = room.players.find(p => p.id === transaction.toId);
+    if (!targetPlayer) return { error: '상대방을 찾을 수 없습니다' };
+    if (targetPlayer.cash < transaction.amount) return { error: '상대방의 잔액이 부족합니다' };
+
+    // 취소 요청 생성 (상대방 동의 필요)
+    const request: CancelRequest = {
+      id: randomUUID(),
+      transactionId,
+      requesterId,
+      targetId: transaction.toId as string,
+      status: 'PENDING',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60000
+    };
+    store.cancelRequests.set(request.id, request);
+    return request;
+  }
+
+  // Task 6.1: 거래 취소 응답
+  respondCancelRequest(roomId: string, requestId: string, responderId: string, approve: boolean): CancelRequest | { error: string } {
+    const request = store.cancelRequests.get(requestId);
+
+    if (!request) return { error: '취소 요청을 찾을 수 없습니다' };
+    if (request.targetId !== responderId) return { error: '해당 요청에 응답할 권한이 없습니다' };
+    if (request.status !== 'PENDING') return { error: '이미 처리된 요청입니다' };
+    if (Date.now() > request.expiresAt) return { error: '요청이 만료되었습니다' };
+
+    request.status = approve ? 'APPROVED' : 'REJECTED';
+    request.respondedAt = Date.now();
+
+    if (approve) {
+      this.cancelTransaction(roomId, request.transactionId, request.requesterId);
+    }
+
+    return request;
+  }
+
+  // Task 6.1: 실제 거래 취소 수행
+  cancelTransaction(roomId: string, transactionId: string, cancelledBy: string): Transaction | { error: string } {
+    const transaction = this.getTransaction(transactionId);
+    if (!transaction) return { error: '거래를 찾을 수 없습니다' };
+
+    const room = store.rooms.get(roomId);
+    if (!room) return { error: '방을 찾을 수 없습니다' };
+
+    // 자산 복원 - 발신자에게 돈 반환
+    const fromPlayer = room.players.find(p => p.id === transaction.fromId);
+    if (fromPlayer) {
+      fromPlayer.cash += transaction.amount;
+    }
+
+    // 수신자로부터 차감 (플레이어인 경우만)
+    if (transaction.toId !== 'BANK' && transaction.toId !== 'FUND') {
+      const toPlayer = room.players.find(p => p.id === transaction.toId);
+      if (toPlayer) {
+        toPlayer.cash -= transaction.amount;
+      }
+    } else if (transaction.toId === 'FUND') {
+      // 복지기금으로 보낸 경우 복지기금에서 차감
+      room.welfareFund -= transaction.amount;
+    }
+    // BANK는 무한 자원이므로 차감 불필요
+
+    transaction.status = 'CANCELLED';
+    transaction.cancelledAt = Date.now();
+    transaction.cancelledBy = cancelledBy;
+
     return transaction;
   }
 }

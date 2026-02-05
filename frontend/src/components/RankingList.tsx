@@ -14,6 +14,7 @@ interface Props {
   className?: string;
   isHost?: boolean;
   onKick?: (playerId: string) => void;
+  onRenameAsset?: (assetId: string, newName: string) => void;
 }
 
 // T016: Helper function to calculate asset count and value by type
@@ -81,7 +82,8 @@ export const RankingList: React.FC<Props> = ({
   currentUserId,
   className = '',
   isHost = false,
-  onKick
+  onKick,
+  onRenameAsset
 }) => {
   // T035: 선택된 플레이어 상태
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -180,10 +182,13 @@ export const RankingList: React.FC<Props> = ({
        </div>
 
        {/* T037: PlayerAssetModal */}
+       {/* Task 7.2: 자산명 수정 기능 추가 */}
        <PlayerAssetModal
          isOpen={selectedPlayer !== null}
          onClose={() => setSelectedPlayer(null)}
          player={selectedPlayer}
+         isCurrentUser={selectedPlayer?.id === currentUserId}
+         onRenameAsset={onRenameAsset}
        />
     </div>
   );

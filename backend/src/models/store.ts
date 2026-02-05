@@ -1,4 +1,4 @@
-import type { Room, Transaction, Vote, DisconnectedSession, Notification, GameEndVote } from '@blue-banker/shared';
+import type { Room, Transaction, Vote, DisconnectedSession, Notification, GameEndVote, CancelRequest } from '@blue-banker/shared';
 
 class Store {
   public rooms: Map<string, Room> = new Map();
@@ -16,6 +16,10 @@ class Store {
   public notifications: Map<string, Notification> = new Map();
   // T010: gameEndVotes Map 추가
   public gameEndVotes: Map<string, GameEndVote> = new Map();
+  // NEW: 거래 취소 요청 저장소
+  public cancelRequests: Map<string, CancelRequest> = new Map();
+  // NEW: 투표 타임아웃 타이머 관리
+  public voteTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
     this.rooms = new Map();
@@ -42,6 +46,10 @@ class Store {
     this.disconnectedSessions.clear();
     this.notifications.clear();
     this.gameEndVotes.clear();
+    this.cancelRequests.clear();
+    // 타임아웃 타이머 정리
+    this.voteTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.voteTimeouts.clear();
   }
 }
 

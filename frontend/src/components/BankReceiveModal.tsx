@@ -60,7 +60,7 @@ export const BankReceiveModal: React.FC<Props> = ({
         <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-gradient-to-r from-amber-900/50 to-orange-900/50">
           <h3 className="font-bold text-lg text-white flex items-center gap-2">
             <span>🏦</span>
-            은행 수령
+            은행에서 돈 받기
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
@@ -128,13 +128,13 @@ export const BankReceiveModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 제출 버튼 */}
+          {/* 제출 버튼 - Task 5.3: 투표 요청으로 변경 */}
           <button
             type="submit"
             disabled={amount <= 0}
             className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 p-4 rounded-xl font-bold transition-colors"
           >
-            수령하기
+            투표 요청하기
           </button>
         </form>
       </div>

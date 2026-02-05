@@ -7,7 +7,7 @@
 
 ## Phase 0: Setup & Type Definitions
 
-### Task 0.1: shared/index.ts 타입 확장
+### [X] Task 0.1: shared/index.ts 타입 확장
 
 **File**: `shared/src/index.ts`
 **Requirements**: FR-010, FR-015, FR-017, FR-019-1, FR-023
@@ -68,7 +68,7 @@
 
 ---
 
-### Task 0.2: Socket 이벤트 타입 정의
+### [X] Task 0.2: Socket 이벤트 타입 정의
 
 **File**: `shared/src/index.ts`
 **Requirements**: FR-007, FR-011, FR-017
@@ -112,7 +112,7 @@
 
 ---
 
-### Task 0.3: Backend Store 확장
+### [X] Task 0.3: Backend Store 확장
 
 **File**: `backend/src/models/store.ts`
 **Requirements**: FR-010, FR-011
@@ -134,7 +134,7 @@
 
 ## Phase 1: 송금 모달 UI 오류 수정 (US1, P1)
 
-### Task 1.1: 송금 버튼 비활성화 로직 수정
+### [X] Task 1.1: 송금 버튼 비활성화 로직 수정
 
 **File**: `frontend/src/components/TransactionModal.tsx`
 **Requirements**: FR-001, FR-002, FR-003
@@ -162,7 +162,7 @@
 
 ## Phase 2: 게임 종료 투표 취소 동기화 (US2, P1)
 
-### Task 2.1: 게임 종료 투표 취소 이벤트 핸들러 추가
+### [X] Task 2.1: 게임 종료 투표 취소 이벤트 핸들러 추가
 
 **File**: `backend/src/handlers/game.handler.ts`
 **Requirements**: FR-007
@@ -180,7 +180,7 @@
 
 ---
 
-### Task 2.2: 게임 종료 투표 모달 닫힘 방지
+### [X] Task 2.2: 게임 종료 투표 모달 닫힘 방지
 
 **File**: `frontend/src/components/GameEndVotePopup.tsx`
 **Requirements**: FR-009
@@ -200,7 +200,7 @@
 
 ---
 
-### Task 2.3: 프론트엔드 취소 이벤트 핸들러 추가
+### [X] Task 2.3: 프론트엔드 취소 이벤트 핸들러 추가
 
 **File**: `frontend/src/hooks/useGame.ts`
 **Requirements**: FR-007, FR-008
@@ -218,7 +218,7 @@
 
 ---
 
-### Task 2.4: 게임 종료 투표 타임아웃 로직 수정
+### [X] Task 2.4: 게임 종료 투표 타임아웃 로직 수정
 
 **File**: `backend/src/services/vote.service.ts`
 **Requirements**: FR-009-1
@@ -253,7 +253,7 @@
 
 ## Phase 3: 사회복지기금 투표 타임아웃 구현 (FR-023)
 
-### Task 3.1: 사회복지기금 투표 타임아웃 핸들러 구현
+### [X] Task 3.1: 사회복지기금 투표 타임아웃 핸들러 구현
 
 **File**: `backend/src/services/vote.service.ts`
 **Requirements**: FR-023
@@ -284,7 +284,7 @@
 
 ---
 
-### Task 3.2: 투표 타임아웃 타이머 등록
+### [X] Task 3.2: 투표 타임아웃 타이머 등록
 
 **File**: `backend/src/handlers/vote.handler.ts`
 **Requirements**: FR-023, FR-009-1

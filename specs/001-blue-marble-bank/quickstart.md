@@ -36,7 +36,7 @@ npm run dev
 ```bash
 cd frontend
 npm run dev
-# Client starts on http://localhost:5173
+# Client starts on http://localhost:15485
 ```
 
 ## 3. Development Workflow

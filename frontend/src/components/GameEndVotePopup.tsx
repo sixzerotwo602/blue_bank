@@ -37,6 +37,21 @@ export const GameEndVotePopup: React.FC<Props> = ({
     return () => clearInterval(interval);
   }, [vote]);
 
+  // NEW: ESC 키로 닫히지 않도록 방지 (FR-009)
+  useEffect(() => {
+    if (!vote || vote.status !== 'IN_PROGRESS') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [vote]);
+
   if (!vote || vote.status !== 'IN_PROGRESS') return null;
 
   const hasVoted = vote.votes && currentUserId && currentUserId in vote.votes;
@@ -66,7 +81,7 @@ export const GameEndVotePopup: React.FC<Props> = ({
             <div className={`text-4xl font-mono font-bold ${remainingTime <= 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
               {remainingTime}초
             </div>
-            <div className="text-slate-500 text-xs mt-1">시간 초과 시 자동으로 동의 처리됩니다</div>
+            <div className="text-slate-500 text-xs mt-1">시간 초과 시 미응답은 거절로 처리됩니다</div>
           </div>
 
           {/* T060: 투표 진행 상황 */}
@@ -108,9 +123,9 @@ export const GameEndVotePopup: React.FC<Props> = ({
             <div className="flex gap-2">
               <button
                 onClick={() => onCastVote(vote.id, false)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 p-4 rounded-xl font-bold transition-colors text-slate-300"
+                className="flex-1 bg-red-600 hover:bg-red-500 p-4 rounded-xl font-bold transition-colors text-white shadow-lg shadow-red-900/20 active:scale-95"
               >
-                반대
+                ✗ 반대
               </button>
               <button
                 onClick={() => onCastVote(vote.id, true)}

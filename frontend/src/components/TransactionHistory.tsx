@@ -9,7 +9,9 @@ interface Props {
   onClose: () => void;
   transactions: Transaction[];
   currentUserId?: string;
-  players: { id: string; nickname: string }[];
+  players: { id: string; nickname: string; cash?: number }[];
+  onRequestCancel?: (transactionId: string) => void;
+  welfareFund?: number; // 복지기금 잔액 (취소 가능 여부 판단용)
 }
 
 // T007-T008: transactionLabels.ts에서 가져온 상수 사용
@@ -104,12 +106,14 @@ const isTransactionTypeString = (str: string): boolean => {
   return TRANSACTION_TYPE_STRINGS.includes(str.toUpperCase());
 };
 
-export const TransactionHistory: React.FC<Props> = ({ 
-  isOpen, 
-  onClose, 
+export const TransactionHistory: React.FC<Props> = ({
+  isOpen,
+  onClose,
   transactions,
   currentUserId,
-  players
+  players,
+  onRequestCancel,
+  welfareFund = 0
 }) => {
   if (!isOpen) return null;
 
@@ -154,21 +158,60 @@ export const TransactionHistory: React.FC<Props> = ({
             transactions.map((tx) => {
               const received = isReceived(tx);
               const detail = getTransactionDetail(tx, getPlayerName);
+              const isCancelled = tx.status === 'CANCELLED';
+
+              // 취소 가능 조건: 내가 보낸 거래, 아직 취소 안됨, 취소 가능한 거래 유형만
+              // 취소 가능: TRANSFER, DONATE, PAY_COST
+              // 취소 불가: BUY_ASSET, SELL_ASSET, SALARY, WELFARE_RECEIVE, BANK_RECEIVE
+              const cancellableTypes: TransactionType[] = ['TRANSFER', 'DONATE', 'PAY_COST'];
+              const canCancel = !received
+                && !isCancelled
+                && tx.fromId === currentUserId
+                && onRequestCancel
+                && cancellableTypes.includes(tx.type);
+
+              // 잔액 확인: 플레이어/복지기금 모두 체크
+              const targetPlayer = players.find(p => p.id === tx.toId);
+              let targetHasEnoughBalance = true;
+              let insufficientReason = '';
+
+              if (tx.toId === 'FUND') {
+                // 복지기금 잔액 확인
+                targetHasEnoughBalance = welfareFund >= tx.amount;
+                if (!targetHasEnoughBalance) {
+                  insufficientReason = '복지기금 잔액 부족';
+                }
+              } else if (tx.toId === 'BANK') {
+                // 은행은 무한 자원
+                targetHasEnoughBalance = true;
+              } else {
+                // 플레이어 잔액 확인
+                targetHasEnoughBalance = (targetPlayer?.cash ?? 0) >= tx.amount;
+                if (!targetHasEnoughBalance) {
+                  insufficientReason = '상대방 잔액 부족';
+                }
+              }
+
               return (
                 <div
                   key={tx.id}
                   className={`p-3 rounded-xl border ${
-                    received
-                      ? 'bg-green-900/20 border-green-500/30'
-                      : 'bg-slate-800/50 border-slate-700'
+                    isCancelled
+                      ? 'bg-slate-800/30 border-slate-700/50 opacity-60'
+                      : received
+                        ? 'bg-green-900/20 border-green-500/30'
+                        : 'bg-slate-800/50 border-slate-700'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{getTransactionIcon(tx.type)}</span>
                       <div>
-                        <div className="font-semibold text-slate-200">
+                        <div className="font-semibold text-slate-200 flex items-center gap-2">
                           {getTransactionTypeLabel(tx.type)}
+                          {isCancelled && (
+                            <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">취소됨</span>
+                          )}
                         </div>
                         <div className="text-xs text-slate-500">
                           {received ? (
@@ -180,7 +223,7 @@ export const TransactionHistory: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`font-bold ${received ? 'text-green-400' : 'text-red-400'}`}>
+                      <div className={`font-bold ${isCancelled ? 'text-slate-500 line-through' : received ? 'text-green-400' : 'text-red-400'}`}>
                         {received ? '+' : '-'}<MoneyDisplay amount={tx.amount} />
                       </div>
                       <div className="text-xs text-slate-600">
@@ -191,6 +234,23 @@ export const TransactionHistory: React.FC<Props> = ({
                   {detail && (
                     <div className="mt-2 text-xs text-slate-400 bg-slate-900/50 p-2 rounded-lg">
                       {detail}
+                    </div>
+                  )}
+                  {/* 취소 버튼 */}
+                  {canCancel && (
+                    <div className="mt-2 pt-2 border-t border-slate-700/50">
+                      <button
+                        onClick={() => onRequestCancel(tx.id)}
+                        disabled={!targetHasEnoughBalance}
+                        className={`w-full text-xs py-2 rounded-lg font-medium transition-colors ${
+                          targetHasEnoughBalance
+                            ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-500/30'
+                            : 'bg-slate-700/30 text-slate-500 cursor-not-allowed border border-slate-600/30'
+                        }`}
+                        title={!targetHasEnoughBalance ? insufficientReason : ''}
+                      >
+                        {targetHasEnoughBalance ? '거래 취소 요청' : `취소 불가 (${insufficientReason})`}
+                      </button>
                     </div>
                   )}
                 </div>

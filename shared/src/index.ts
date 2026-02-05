@@ -96,7 +96,10 @@ export type BankReceiveReason =
   | 'BONUS'         // 보너스
   | 'OTHER';        // 기타 (customReason 필드 사용)
 
-// T003: Transaction 인터페이스 확장 (reason, soldAsset 필드 추가)
+// T003: TransactionStatus 타입 추가 (거래 취소 기능)
+export type TransactionStatus = 'COMPLETED' | 'CANCELLED' | 'PENDING_CANCEL';
+
+// T003: Transaction 인터페이스 확장 (reason, soldAsset, status 필드 추가)
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -113,12 +116,29 @@ export interface Transaction {
     assetName: string;
     originalValue: number;
   };
+  // NEW: 거래 상태
+  status: TransactionStatus;
+  // NEW: 취소 관련 정보
+  cancelledAt?: number;
+  cancelledBy?: string;
+}
+
+// NEW: 거래 취소 요청 인터페이스
+export interface CancelRequest {
+  id: string;
+  transactionId: string;
+  requesterId: string;      // 취소 요청자
+  targetId: string;         // 상대방 (동의 필요)
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+  createdAt: number;
+  expiresAt: number;        // 60초 후
+  respondedAt?: number;
 }
 
 export type VoteStatus = 'IN_PROGRESS' | 'APPROVED' | 'REJECTED';
 
-// T005: VoteType 확장
-export type VoteType = 'WELFARE' | 'GAME_END';
+// T005: VoteType 확장 (BANK_RECEIVE 추가)
+export type VoteType = 'WELFARE' | 'GAME_END' | 'BANK_RECEIVE';
 
 export interface Vote {
   id: string;
@@ -130,6 +150,8 @@ export interface Vote {
   votes: Record<string, boolean>; // userId -> approve(true)/reject(false)
   createdAt: number;
   expiresAt: number;
+  timeoutHandledAs?: 'REJECT';  // NEW: 미응답 처리 방식 (모든 투표 거절로 통일)
+  reason?: BankReceiveReason | string;  // NEW: 은행 수령 사유 (BANK_RECEIVE 투표일 때)
 }
 
 // T004: NotificationType, Notification 인터페이스 추가
@@ -162,11 +184,11 @@ export interface GameEndVote {
   id: string;
   roomId: string;
   requesterId: string;          // 호스트 ID
-  status: 'IN_PROGRESS' | 'APPROVED' | 'REJECTED';
+  status: 'IN_PROGRESS' | 'APPROVED' | 'REJECTED' | 'CANCELLED';  // CANCELLED 추가
   votes: Record<string, boolean | null>;  // null = 미응답
   createdAt: number;
   expiresAt: number;            // 60초 후
-  timeoutHandledAs: 'APPROVE';  // 미응답 처리 방식
+  timeoutHandledAs: 'REJECT';   // 미응답 처리 방식: 'APPROVE' → 'REJECT' 변경
 }
 
 export interface Ranking {
@@ -206,6 +228,18 @@ export interface ServerToClientEvents {
   'game_end_vote:started': (vote: GameEndVote) => void;
   'game_end_vote:updated': (vote: GameEndVote) => void;
   'game_end_vote:ended': (vote: GameEndVote) => void;
+  // NEW: 게임 종료 투표 취소
+  'game_end_vote:cancelled': (payload: { voteId: string; cancelledBy: string }) => void;
+  // NEW: 거래 취소 이벤트
+  'tx:cancel_requested': (request: CancelRequest) => void;
+  'tx:cancel_responded': (request: CancelRequest) => void;
+  'tx:cancelled': (transaction: Transaction) => void;
+  // NEW: 은행 수령 투표 이벤트
+  'bank_receive_vote:started': (vote: Vote) => void;
+  'bank_receive_vote:updated': (vote: Vote) => void;
+  'bank_receive_vote:ended': (vote: Vote) => void;
+  // NEW: 자산명 변경
+  'asset:renamed': (payload: { playerId: string; assetId: string; oldName: string; newName: string }) => void;
 }
 
 // T007: ClientToServerEvents에 새 이벤트 타입 추가
@@ -241,8 +275,9 @@ export interface ClientToServerEvents {
     callback: (response: { success: boolean; message?: string }) => void
   ) => void;
   // NEW: 자산 매각 요청
+  // Task 4.2: bundleSell 옵션 추가 (토지 매각 시 건물 일괄 처리)
   'tx:sell_asset': (
-    payload: { assetId: string },
+    payload: { assetId: string; bundleSell?: boolean },
     callback: (response: { success: boolean; message?: string; receivedAmount?: number }) => void
   ) => void;
   // NEW: 게임 종료 투표 요청 (호스트 전용)
@@ -257,5 +292,13 @@ export interface ClientToServerEvents {
   // NEW: 알림 조회
   'notification:get_list': (callback: (notifications: Notification[]) => void) => void;
   'notification:get_unread_count': (callback: (count: number) => void) => void;
+  // NEW: 거래 취소 요청
+  'tx:request_cancel': (transactionId: string, callback: (response: { success: boolean; error?: string; requestId?: string }) => void) => void;
+  // NEW: 거래 취소 응답
+  'tx:respond_cancel': (requestId: string, approve: boolean, callback: (response: { success: boolean; error?: string }) => void) => void;
+  // NEW: 은행 수령 투표 요청
+  'vote:request_bank_receive': (payload: { amount: number; reason: BankReceiveReason; customReason?: string }, callback: (response: { success: boolean; error?: string; voteId?: string }) => void) => void;
+  // NEW: 자산명 변경
+  'asset:rename': (assetId: string, newName: string, callback: (response: { success: boolean; error?: string }) => void) => void;
 }
 

@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { roomService } from '../services/room.service.js';
 import { connectionService } from '../services/connection.service.js';
+import { store } from '../models/store.js';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
 
 export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToClientEvents>, socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
@@ -59,6 +60,49 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
       } else {
           callback({ error: 'Room not found' });
       }
+  });
+
+  // Task 7.2: 자산명 수정 핸들러
+  socket.on('asset:rename', (assetId: string, newName: string, callback) => {
+    try {
+      // 플레이어가 속한 방 찾기
+      let roomId: string | null = null;
+      for (const room of store.rooms.values()) {
+        if (room.players.some(p => p.id === socket.id)) {
+          roomId = room.id;
+          break;
+        }
+      }
+
+      if (!roomId) {
+        return callback({ success: false, error: '방을 찾을 수 없습니다' });
+      }
+
+      const result = roomService.renameAsset(roomId, socket.id, assetId, newName);
+
+      if (!result.success) {
+        return callback({ success: false, error: result.error || '자산명 변경 실패' });
+      }
+
+      // 모든 플레이어에게 알림
+      io.to(roomId).emit('asset:renamed', {
+        playerId: socket.id,
+        assetId,
+        oldName: result.oldName || '',
+        newName
+      });
+
+      // 방 상태 동기화
+      const room = roomService.getRoom(roomId);
+      if (room) {
+        io.to(roomId).emit('room:sync', room);
+      }
+
+      callback({ success: true });
+
+    } catch (error: any) {
+      callback({ success: false, error: error.message || '자산명 변경 실패' });
+    }
   });
 };
 

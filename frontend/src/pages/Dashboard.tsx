@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGame } from '../hooks/useGame';
 import { useSocket } from '../hooks/useSocket';
@@ -8,7 +8,9 @@ import { TransactionHistory } from '../components/TransactionHistory';
 import { BankReceiveModal } from '../components/BankReceiveModal';
 import { SellAssetModal } from '../components/SellAssetModal';
 import { GameEndVotePopup } from '../components/GameEndVotePopup';
-import { VotePopup } from '../components/VotePopup';
+import { BankReceiveVotePopup } from '../components/BankReceiveVotePopup';
+import { CancelRequestPopup } from '../components/CancelRequestPopup';
+import { WelfareFundVotePopup } from '../components/WelfareFundVotePopup';
 import { RankingList } from '../components/RankingList';
 import { ConfirmModal } from '../components/ConfirmModal';
 // ConnectionStatus and KickPlayerButton are now used in RankingList
@@ -18,7 +20,7 @@ import { SettlementView } from '../components/SettlementView';
 
 export const Dashboard: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, kickPlayer, getTransactionHistory, bankReceive, sellAsset, gameEndVote, requestGameEnd, castGameEndVote, cancelGameEndVote } = useGame(roomId);
+  const { room, requestTransaction, activeVote, castVote, requestFund, rankings, kickPlayer, getTransactionHistory, requestBankReceive, sellAsset, gameEndVote, requestGameEnd, castGameEndVote, cancelGameEndVote, bankReceiveVote, cancelRequest, respondCancelTransaction, requestCancelTransaction, renameAsset, setTransactionUpdateCallback } = useGame(roomId);
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
@@ -49,6 +51,24 @@ export const Dashboard: React.FC = () => {
   const closeConfirm = () => {
       setConfirmState(prev => ({ ...prev, isOpen: false }));
   };
+
+  // 거래 내역 갱신 함수 (훅은 조건부 반환 전에 호출되어야 함)
+  const refreshTransactions = useCallback(async () => {
+      if (historyOpen) {
+          const history = await getTransactionHistory();
+          setTransactions(history);
+      }
+  }, [historyOpen, getTransactionHistory]);
+
+  // 거래 취소 시 실시간 갱신을 위한 콜백 등록
+  useEffect(() => {
+      if (historyOpen) {
+          setTransactionUpdateCallback(refreshTransactions);
+      } else {
+          setTransactionUpdateCallback(null);
+      }
+      return () => setTransactionUpdateCallback(null);
+  }, [historyOpen, refreshTransactions, setTransactionUpdateCallback]);
 
   if (!room) return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
@@ -231,11 +251,12 @@ export const Dashboard: React.FC = () => {
           </section>
 
           {/* Ranking List */}
-          <RankingList 
-            players={room.players} 
-            currentUserId={socket?.id} 
+          <RankingList
+            players={room.players}
+            currentUserId={socket?.id}
             isHost={isHost}
             onKick={handleKickPlayer}
+            onRenameAsset={renameAsset}
           />
 
           {/* Host Actions: Game End */}
@@ -281,7 +302,7 @@ export const Dashboard: React.FC = () => {
        />
 
        {activeVote && (
-         <VotePopup 
+         <WelfareFundVotePopup
            vote={activeVote}
            players={room.players}
            currentUserId={socket?.id}
@@ -296,13 +317,15 @@ export const Dashboard: React.FC = () => {
           transactions={transactions}
           currentUserId={socket?.id}
           players={room.players}
+          onRequestCancel={requestCancelTransaction}
+          welfareFund={room.welfareFund}
         />
         
-        {/* T012: 은행 수령 모달 (모든 플레이어 사용 가능) */}
+        {/* Task 5.3: 은행 수령 모달 - 투표 시스템으로 전환 */}
         <BankReceiveModal
           isOpen={bankReceiveOpen}
           onClose={() => setBankReceiveOpen(false)}
-          onSubmit={(amount, reason) => bankReceive(socket?.id || '', amount, reason)}
+          onSubmit={(amount, reason) => requestBankReceive(amount, reason)}
           currentUserId={socket?.id}
           currentUserNickname={me?.nickname}
         />
@@ -323,6 +346,26 @@ export const Dashboard: React.FC = () => {
             currentUserId={socket?.id}
             onCastVote={castGameEndVote}
             onCancelVote={cancelGameEndVote}
+          />
+        )}
+
+        {/* Task 5.4: 은행 수령 투표 팝업 */}
+        {bankReceiveVote && room && (
+          <BankReceiveVotePopup
+            vote={bankReceiveVote}
+            players={room.players}
+            currentUserId={socket?.id}
+            onCastVote={castVote}
+          />
+        )}
+
+        {/* Task 6.4: 거래 취소 요청 팝업 */}
+        {cancelRequest && room && (
+          <CancelRequestPopup
+            request={cancelRequest}
+            players={room.players}
+            transactions={transactions}
+            onRespond={respondCancelTransaction}
           />
         )}
 

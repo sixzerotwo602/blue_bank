@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from './useSocket';
-import type { Room, Vote, Transaction, ConnectionStatusPayload, HostMigratingPayload, HostMigratedPayload, PlayerKickedPayload, Notification } from '@blue-banker/shared';
+import type { Room, Vote, Transaction, ConnectionStatusPayload, HostMigratingPayload, HostMigratedPayload, PlayerKickedPayload, Notification, BankReceiveReason, CancelRequest } from '@blue-banker/shared';
 import toast from 'react-hot-toast';
 import useSound from 'use-sound';
 
@@ -14,6 +14,12 @@ export const useGame = (roomId?: string) => {
   const [activeVote, setActiveVote] = useState<Vote | null>(null);
   // T062: 게임 종료 투표 상태
   const [gameEndVote, setGameEndVote] = useState<Vote | null>(null);
+  // Task 5.4: 은행 수령 투표 상태
+  const [bankReceiveVote, setBankReceiveVote] = useState<Vote | null>(null);
+  // Task 6.4: 거래 취소 요청 상태
+  const [cancelRequest, setCancelRequest] = useState<CancelRequest | null>(null);
+  // 거래 업데이트 콜백 (실시간 갱신용)
+  const transactionUpdateCallbackRef = useRef<(() => void) | null>(null);
 
   // Sound effects
   const [playSuccess] = useSound('/sounds/success.mp3');
@@ -161,6 +167,65 @@ export const useGame = (roomId?: string) => {
             setTimeout(() => setGameEndVote(null), 3000);
         }
     };
+    // NEW: 게임 종료 투표 취소 이벤트 핸들러 (FR-007, FR-008)
+    const onGameEndVoteCancelled = (_payload: { voteId: string; cancelledBy: string }) => {
+        setGameEndVote(null);
+        toast.success('게임종료 투표가 취소되었습니다');
+    };
+
+    // Task 5.5: 은행 수령 투표 이벤트 핸들러
+    const onBankReceiveVoteStarted = (vote: Vote) => {
+        setBankReceiveVote(vote);
+        const requester = room?.players.find(p => p.id === vote.requesterId);
+        const requesterName = requester?.nickname || '플레이어';
+        toast(`${requesterName}님이 은행 수령을 요청했습니다`, { icon: '🏦' });
+    };
+
+    const onBankReceiveVoteUpdated = (vote: Vote) => {
+        setBankReceiveVote(vote);
+    };
+
+    const onBankReceiveVoteEnded = (vote: Vote) => {
+        setBankReceiveVote(null);
+        const requester = room?.players.find(p => p.id === vote.requesterId);
+        const requesterName = requester?.nickname || '플레이어';
+        if (vote.status === 'APPROVED') {
+            toast.success(`${requesterName}님의 은행 수령이 승인되었습니다`);
+            playSuccess();
+        } else {
+            toast.error(`${requesterName}님의 은행 수령이 거절되었습니다`);
+        }
+    };
+
+    // Task 6.5: 거래 취소 이벤트 핸들러
+    const onCancelRequested = (request: CancelRequest) => {
+        setCancelRequest(request);
+        toast('거래 취소 요청이 도착했습니다', { icon: '❌', duration: 10000 });
+    };
+
+    const onCancelResponded = (request: CancelRequest) => {
+        setCancelRequest(null);
+        if (request.status === 'APPROVED') {
+            toast.success('거래 취소가 승인되었습니다');
+            playSuccess();
+            // 거래 내역 실시간 갱신 콜백 호출
+            if (transactionUpdateCallbackRef.current) {
+                transactionUpdateCallbackRef.current();
+            }
+        } else if (request.status === 'REJECTED') {
+            toast.error('거래 취소가 거절되었습니다');
+        } else {
+            toast.error('거래 취소 요청이 만료되었습니다');
+        }
+    };
+
+    const onTransactionCancelled = (_transaction: Transaction) => {
+        toast(`거래가 취소되었습니다`, { icon: '↩️' });
+        // 거래 내역 실시간 갱신 콜백 호출
+        if (transactionUpdateCallbackRef.current) {
+            transactionUpdateCallbackRef.current();
+        }
+    };
 
     // T017: notification:received 이벤트 핸들러 (송금 수신 등)
     const onNotificationReceived = (notification: Notification) => {
@@ -211,6 +276,23 @@ export const useGame = (roomId?: string) => {
     socket.on('game_end_vote:updated', onGameEndVoteUpdated);
     // @ts-ignore
     socket.on('game_end_vote:ended', onGameEndVoteEnded);
+    // NEW: 게임 종료 투표 취소 이벤트 (FR-007, FR-008)
+    // @ts-ignore
+    socket.on('game_end_vote:cancelled', onGameEndVoteCancelled);
+    // Task 5.5: 은행 수령 투표 이벤트
+    // @ts-ignore
+    socket.on('bank_receive_vote:started', onBankReceiveVoteStarted);
+    // @ts-ignore
+    socket.on('bank_receive_vote:updated', onBankReceiveVoteUpdated);
+    // @ts-ignore
+    socket.on('bank_receive_vote:ended', onBankReceiveVoteEnded);
+    // Task 6.5: 거래 취소 이벤트
+    // @ts-ignore
+    socket.on('tx:cancel_requested', onCancelRequested);
+    // @ts-ignore
+    socket.on('tx:cancel_responded', onCancelResponded);
+    // @ts-ignore
+    socket.on('tx:cancelled', onTransactionCancelled);
     // T017: Notification events
     // @ts-ignore
     socket.on('notification:received', onNotificationReceived);
@@ -249,9 +331,23 @@ export const useGame = (roomId?: string) => {
       // @ts-ignore
       socket.off('game_end_vote:ended', onGameEndVoteEnded);
       // @ts-ignore
+      socket.off('game_end_vote:cancelled', onGameEndVoteCancelled);
+      // @ts-ignore
+      socket.off('bank_receive_vote:started', onBankReceiveVoteStarted);
+      // @ts-ignore
+      socket.off('bank_receive_vote:updated', onBankReceiveVoteUpdated);
+      // @ts-ignore
+      socket.off('bank_receive_vote:ended', onBankReceiveVoteEnded);
+      // @ts-ignore
+      socket.off('tx:cancel_requested', onCancelRequested);
+      // @ts-ignore
+      socket.off('tx:cancel_responded', onCancelResponded);
+      // @ts-ignore
+      socket.off('tx:cancelled', onTransactionCancelled);
+      // @ts-ignore
       socket.off('notification:received', onNotificationReceived);
     };
-  }, [socket, roomId, navigate, playSuccess, playError]);
+  }, [socket, roomId, navigate, playSuccess, playError, room]);
 
   // Auto-rejoin on refresh/connect (T060)
   const hasAttemptedRelogin = useRef(false);
@@ -388,7 +484,7 @@ export const useGame = (roomId?: string) => {
       });
   }, [socket]);
 
-  // T042: 은행 수령 (호스트 전용)
+  // T042: 은행 수령 (호스트 전용 - 직접 지급)
   const bankReceive = useCallback((playerId: string, amount: number, reason: string) => {
       return new Promise<boolean>((resolve) => {
           if (!socket) {
@@ -410,21 +506,103 @@ export const useGame = (roomId?: string) => {
       });
   }, [socket, playSuccess, playError]);
 
+  // Task 5.3: 은행 수령 투표 요청 (일반 플레이어용)
+  const requestBankReceive = useCallback((amount: number, reason: BankReceiveReason, customReason?: string) => {
+      return new Promise<boolean>((resolve) => {
+          if (!socket) {
+              resolve(false);
+              return;
+          }
+          socket.emit('vote:request_bank_receive', { amount, reason, customReason }, (res: any) => {
+              if (!res.success) {
+                  toast.error(res.error || '투표 요청 실패');
+                  playError();
+                  resolve(false);
+              } else {
+                  toast.success('투표 요청이 전송되었습니다');
+                  resolve(true);
+              }
+          });
+      });
+  }, [socket, playError]);
+
+  // Task 6.5: 거래 취소 요청
+  const requestCancelTransaction = useCallback((transactionId: string) => {
+      return new Promise<boolean>((resolve) => {
+          if (!socket) {
+              resolve(false);
+              return;
+          }
+          socket.emit('tx:request_cancel', transactionId, (res: any) => {
+              if (!res.success) {
+                  toast.error(res.error || '거래 취소 요청 실패');
+                  playError();
+                  resolve(false);
+              } else {
+                  toast.success('거래 취소 요청이 전송되었습니다');
+                  resolve(true);
+              }
+          });
+      });
+  }, [socket, playError]);
+
+  // Task 6.5: 거래 취소 응답
+  const respondCancelTransaction = useCallback((requestId: string, approve: boolean) => {
+      return new Promise<boolean>((resolve) => {
+          if (!socket) {
+              resolve(false);
+              return;
+          }
+          socket.emit('tx:respond_cancel', requestId, approve, (res: any) => {
+              if (!res.success) {
+                  toast.error(res.error || '응답 실패');
+                  playError();
+                  resolve(false);
+              } else {
+                  setCancelRequest(null);
+                  resolve(true);
+              }
+          });
+      });
+  }, [socket, playError]);
+
   // T051: 자산 매각
-  const sellAsset = useCallback((assetId: string) => {
+  // Task 4.2: bundleSell 옵션 추가 (토지 매각 시 건물 일괄 처리)
+  const sellAsset = useCallback((assetId: string, bundleSell?: boolean) => {
       return new Promise<boolean>((resolve) => {
           if (!socket) {
               resolve(false);
               return;
           }
           // @ts-ignore - SELL_ASSET uses toId as assetId
-          socket.emit('tx:request', { type: 'SELL_ASSET', amount: 0, toId: assetId }, (res: any) => {
+          socket.emit('tx:request', { type: 'SELL_ASSET', amount: 0, toId: assetId, bundleSell }, (res: any) => {
               if (!res.success) {
                   toast.error(res.error || '매각 실패');
                   playError();
                   resolve(false);
               } else {
                   toast.success('자산 매각 완료!');
+                  playSuccess();
+                  resolve(true);
+              }
+          });
+      });
+  }, [socket, playSuccess, playError]);
+
+  // Task 7.3: 자산명 수정
+  const renameAsset = useCallback((assetId: string, newName: string) => {
+      return new Promise<boolean>((resolve) => {
+          if (!socket) {
+              resolve(false);
+              return;
+          }
+          socket.emit('asset:rename', assetId, newName, (res: any) => {
+              if (!res.success) {
+                  toast.error(res.error || '자산명 변경 실패');
+                  playError();
+                  resolve(false);
+              } else {
+                  toast.success('자산명이 변경되었습니다');
                   playSuccess();
                   resolve(true);
               }
@@ -495,6 +673,11 @@ export const useGame = (roomId?: string) => {
       });
   }, [socket, playError]);
 
+  // 거래 업데이트 콜백 등록 (실시간 갱신용)
+  const setTransactionUpdateCallback = useCallback((callback: (() => void) | null) => {
+    transactionUpdateCallbackRef.current = callback;
+  }, []);
+
   return {
     room,
     error,
@@ -502,6 +685,8 @@ export const useGame = (roomId?: string) => {
     activeVote,
     rankings,
     gameEndVote,  // T062
+    bankReceiveVote,  // Task 5.4
+    cancelRequest,  // Task 6.4
     createRoom,
     joinRoom,
     startGame,
@@ -512,10 +697,16 @@ export const useGame = (roomId?: string) => {
     kickPlayer,
     getTransactionHistory,
     bankReceive,
+    requestBankReceive,  // Task 5.3
     sellAsset,
+    requestCancelTransaction,  // Task 6.5
+    respondCancelTransaction,  // Task 6.5
+    renameAsset,  // Task 7.3
     requestGameEnd,  // T062
     castGameEndVote,  // T062
-    cancelGameEndVote  // T049
+    cancelGameEndVote,  // T049
+    // 거래 업데이트 콜백 등록 (실시간 갱신용)
+    setTransactionUpdateCallback
   };
 };
 

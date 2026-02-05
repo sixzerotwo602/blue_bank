@@ -109,7 +109,7 @@ npm install
 npm run dev -w backend
 ```
 
-**Frontend 실행** (Port: 5173)
+**Frontend 실행** (Port: 15485)
 
 ```bash
 npm run dev -w frontend

@@ -169,7 +169,12 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
 
           const room = store.rooms.get(vote.roomId);
           if (room) {
-              // 취소된 투표 브로드캐스트
+              // NEW: 취소 전용 이벤트 브로드캐스트 (클라이언트에서 모달 닫힘 + 토스트 표시)
+              io.to(vote.roomId).emit('game_end_vote:cancelled', {
+                  voteId: vote.id,
+                  cancelledBy: socket.id
+              });
+              // 기존 ended 이벤트도 유지 (하위 호환성)
               io.to(vote.roomId).emit('game_end_vote:ended', vote);
           }
 

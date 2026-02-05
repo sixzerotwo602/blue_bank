@@ -283,7 +283,7 @@ export const TransactionModal: React.FC<Props> = ({
                    <button
                      key={p.id}
                      type="button"
-                     onClick={() => setToId(p.id)}
+                     onClick={() => setToId(toId === p.id ? '' : p.id)}
                      className={`p-3 rounded-xl border text-left transition-all ${
                        toId === p.id
                        ? 'border-blue-500 bg-blue-500/20 text-blue-300'
@@ -469,7 +469,7 @@ export const TransactionModal: React.FC<Props> = ({
                    onSubmit('PAY_COST', cleanAmount);
                  }}
                  className="bg-red-600 hover:bg-red-500 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                 disabled={!amount}
+                 disabled={!amount || !!toId}
                >
                  은행으로 송금
                </button>

@@ -17,7 +17,7 @@ cd frontend && npm run dev
 
 ### 2. 브라우저에서 테스트
 
-http://localhost:5173 접속
+http://localhost:15485 접속
 
 ---
 

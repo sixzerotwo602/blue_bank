@@ -89,6 +89,42 @@ export class RoomService {
   getRoom(roomId: string): Room | undefined {
     return store.rooms.get(roomId);
   }
+
+  // Task 7.1: 자산명 수정
+  renameAsset(roomId: string, playerId: string, assetId: string, newName: string): { success: boolean; error?: string; oldName?: string } {
+    // 이름 검증
+    if (!newName || newName.trim() === '') {
+      return { success: false, error: '자산 이름은 비워둘 수 없습니다' };
+    }
+    if (newName.length > 20) {
+      return { success: false, error: '자산 이름은 20자 이하여야 합니다' };
+    }
+
+    const room = store.rooms.get(roomId);
+    if (!room) {
+      return { success: false, error: '방을 찾을 수 없습니다' };
+    }
+
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) {
+      return { success: false, error: '플레이어를 찾을 수 없습니다' };
+    }
+
+    const asset = player.assets.find(a => a.id === assetId);
+    if (!asset) {
+      return { success: false, error: '자산을 찾을 수 없습니다' };
+    }
+
+    // 토지만 이름 변경 가능
+    if (asset.type !== 'LAND') {
+      return { success: false, error: '토지만 이름을 변경할 수 있습니다' };
+    }
+
+    const oldName = asset.name || '';
+    asset.name = newName.trim();
+
+    return { success: true, oldName };
+  }
 }
 
 export const roomService = new RoomService();

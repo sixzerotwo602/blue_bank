@@ -28,7 +28,8 @@ export const registerTransactionHandlers = (
      return null;
   };
 
-  socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; reason?: string }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
+  // Task 4.2: bundleSell 옵션 추가
+  socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; reason?: string; bundleSell?: boolean }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
     try {
         const roomId = getRoomId();
         if (!roomId) {
@@ -178,6 +179,83 @@ export const registerTransactionHandlers = (
     } catch (error: any) {
       // 에러 시 빈 배열 반환
       callback([]);
+    }
+  });
+
+  // Task 6.2: 거래 취소 요청 핸들러
+  socket.on('tx:request_cancel', (transactionId: string, callback) => {
+    try {
+      const roomId = getRoomId();
+      if (!roomId) {
+        return callback({ success: false, error: '방을 찾을 수 없습니다' });
+      }
+
+      const result = transactionService.requestCancelTransaction(roomId, transactionId, socket.id);
+
+      if ('error' in result) {
+        return callback({ success: false, error: result.error });
+      }
+
+      // 플레이어 간 거래인 경우 상대방에게 알림
+      if (result.targetId !== 'BANK' && result.targetId !== 'FUND') {
+        io.to(result.targetId).emit('tx:cancel_requested', result);
+
+        // 60초 타임아웃 설정
+        setTimeout(() => {
+          const request = store.cancelRequests.get(result.id);
+          if (request && request.status === 'PENDING') {
+            request.status = 'EXPIRED';
+            io.to(result.requesterId).emit('tx:cancel_responded', request);
+          }
+        }, 60000);
+      } else {
+        // 은행/복지기금 거래는 즉시 취소 완료
+        const room = store.rooms.get(roomId);
+        if (room) {
+          io.to(roomId).emit('room:sync', room);
+        }
+      }
+
+      callback({ success: true, requestId: result.id });
+
+    } catch (error: any) {
+      callback({ success: false, error: error.message || '거래 취소 요청 실패' });
+    }
+  });
+
+  // Task 6.2: 거래 취소 응답 핸들러
+  socket.on('tx:respond_cancel', (requestId: string, approve: boolean, callback) => {
+    try {
+      const roomId = getRoomId();
+      if (!roomId) {
+        return callback({ success: false, error: '방을 찾을 수 없습니다' });
+      }
+
+      const result = transactionService.respondCancelRequest(roomId, requestId, socket.id, approve);
+
+      if ('error' in result) {
+        return callback({ success: false, error: result.error });
+      }
+
+      // 요청자에게 결과 알림
+      io.to(result.requesterId).emit('tx:cancel_responded', result);
+
+      // 승인된 경우 방 전체에 알림 및 동기화
+      if (result.status === 'APPROVED') {
+        const transaction = transactionService.getTransaction(result.transactionId);
+        if (transaction) {
+          io.to(roomId).emit('tx:cancelled', transaction);
+        }
+        const room = store.rooms.get(roomId);
+        if (room) {
+          io.to(roomId).emit('room:sync', room);
+        }
+      }
+
+      callback({ success: true });
+
+    } catch (error: any) {
+      callback({ success: false, error: error.message || '거래 취소 응답 실패' });
     }
   });
 };
