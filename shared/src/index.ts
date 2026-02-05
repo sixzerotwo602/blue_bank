@@ -9,6 +9,7 @@ export interface Asset {
   name?: string;
   value: number;
   createdAt: number;
+  landId?: string; // NEW: 건물이 위치한 토지 ID (건물인 경우)
 }
 
 // Connection Status Types (T001)
