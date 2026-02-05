@@ -68,7 +68,7 @@ export const useGame = (roomId?: string) => {
             toast.success(`투표 ${result}!`);
             playSuccess();
             // 복지기금 투표 승인 시 거래 내역 갱신 (락 상태 업데이트)
-            if (vote.type === 'WELFARE_FUND' && transactionUpdateCallbackRef.current) {
+            if (vote.voteType === 'WELFARE_FUND' && transactionUpdateCallbackRef.current) {
                 transactionUpdateCallbackRef.current();
             }
         } else {
