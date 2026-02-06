@@ -1,5 +1,5 @@
 import { store } from '../models/store.js';
-import type { Room, Player } from '@blue-banker/shared';
+import type { Room, Player, Ranking } from '@blue-banker/shared';
 
 export class RoomService {
   private generateRoomId(): string {
@@ -26,9 +26,8 @@ export class RoomService {
       isReady: false,
       isHost: true,
       connected: true,
-      connectionStatus: 'ONLINE', // (T018) Initialize connection status
-      lastSeenAt: Date.now(),      // (T018) Initialize last seen time
-      disconnectedAt: null,        // (T018) Initialize disconnect time
+      connectionStatus: 'ONLINE',
+      disconnectedAt: null,
     };
 
     const room: Room = {
@@ -41,6 +40,8 @@ export class RoomService {
     };
 
     store.rooms.set(roomId, room);
+    // 인덱스 등록: 호스트를 playerToRoom에 추가
+    store.playerToRoom.set(hostId, roomId);
     return room;
   }
 
@@ -77,17 +78,34 @@ export class RoomService {
       isReady: false,
       isHost: false,
       connected: true,
-      connectionStatus: 'ONLINE', // (T018) Initialize connection status
-      lastSeenAt: Date.now(),      // (T018) Initialize last seen time
-      disconnectedAt: null,        // (T018) Initialize disconnect time
+      connectionStatus: 'ONLINE',
+      disconnectedAt: null,
     };
 
     room.players.push(player);
+    // 인덱스 등록: 플레이어를 playerToRoom에 추가
+    store.playerToRoom.set(playerId, roomId);
     return { success: true };
   }
 
   getRoom(roomId: string): Room | undefined {
     return store.rooms.get(roomId);
+  }
+
+  /** 플레이어 목록으로 랭킹을 계산합니다 (Cash + AssetValue 기준 내림차순) */
+  calculateRankings(players: Player[]): Ranking[] {
+    const rankings: Ranking[] = players
+      .map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        cash: p.cash,
+        assetValue: p.assetValue,
+        totalAssets: p.cash + p.assetValue,
+        rank: 0
+      }))
+      .sort((a, b) => b.totalAssets - a.totalAssets);
+    rankings.forEach((r, index) => { r.rank = index + 1; });
+    return rankings;
   }
 
   // Task 7.1: 자산명 수정

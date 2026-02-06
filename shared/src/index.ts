@@ -50,7 +50,6 @@ export interface Player {
   isHost: boolean;
   connected: boolean;
   connectionStatus: ConnectionStatus; // [NEW] Connection status
-  lastSeenAt: number; // [NEW] Last activity timestamp
   disconnectedAt: number | null; // [NEW] Disconnect timestamp
 }
 
@@ -260,9 +259,6 @@ export interface ClientToServerEvents {
   }, callback?: (response: { success: boolean, txId?: string, error?: string }) => void) => void;
   'vote:request_fund': (amount: number) => void;
   'vote:cast': (voteId: string, approve: boolean) => void;
-  // Connection events
-  'connection:heartbeat': () => void;
-  'room:rejoin': (roomId: string, nickname: string, callback: (response: { success: boolean, message?: string }) => void) => void;
   'player:kick': (playerId: string, callback: (response: { success: boolean, message?: string }) => void) => void;
   // NEW: 거래 내역 조회 요청
   'transaction:get_history': (callback: (transactions: Transaction[]) => void) => void;

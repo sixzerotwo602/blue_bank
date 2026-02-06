@@ -3,35 +3,19 @@ import type { ClientToServerEvents, ServerToClientEvents, TransactionType, Notif
 import { transactionService } from '../services/transaction.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { store } from '../models/store.js';
-
-// 금액을 만원 단위로 변환
-function formatManwon(amount: number): string {
-  if (amount === 0) return '0원';
-  const manwon = amount / 10000;
-  if (Number.isInteger(manwon)) {
-    return `${manwon.toLocaleString()}만원`;
-  } else {
-    return `${manwon.toFixed(2).replace(/\.?0+$/, '')}만원`;
-  }
-}
+import { getRoomId, formatManwon } from '../utils/helpers.js';
+import { CANCEL_REQUEST_TIMEOUT_MS } from '../utils/constants.js';
+import { timerManager } from '../utils/timer-manager.js';
 
 export const registerTransactionHandlers = (
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   socket: Socket<ClientToServerEvents, ServerToClientEvents>
 ) => {
-  const getRoomId = () => {
-     for (const room of store.rooms.values()) {
-        if (room.players.some(p => p.id === socket.id)) {
-            return room.id;
-        }
-     }
-     return null;
-  };
 
   // Task 4.2: bundleSell 옵션 추가
   socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; reason?: string; bundleSell?: boolean }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
     try {
-        const roomId = getRoomId();
+        const roomId = getRoomId(socket.id);
         if (!roomId) {
             throw new Error('방을 찾을 수 없습니다');
         }
@@ -185,7 +169,7 @@ export const registerTransactionHandlers = (
   // Task 6.2: 거래 취소 요청 핸들러
   socket.on('tx:request_cancel', (transactionId: string, callback) => {
     try {
-      const roomId = getRoomId();
+      const roomId = getRoomId(socket.id);
       if (!roomId) {
         return callback({ success: false, error: '방을 찾을 수 없습니다' });
       }
@@ -200,14 +184,14 @@ export const registerTransactionHandlers = (
       if (result.targetId !== 'BANK' && result.targetId !== 'FUND') {
         io.to(result.targetId).emit('tx:cancel_requested', result);
 
-        // 60초 타임아웃 설정
-        setTimeout(() => {
+        // 거래 취소 요청 타임아웃 (TimerManager)
+        timerManager.set(`${roomId}:cancel:${result.id}`, () => {
           const request = store.cancelRequests.get(result.id);
           if (request && request.status === 'PENDING') {
             request.status = 'EXPIRED';
             io.to(result.requesterId).emit('tx:cancel_responded', request);
           }
-        }, 60000);
+        }, CANCEL_REQUEST_TIMEOUT_MS);
       } else {
         // 은행/복지기금 거래는 즉시 취소 완료
         const transaction = transactionService.getTransaction(transactionId);
@@ -230,7 +214,7 @@ export const registerTransactionHandlers = (
   // Task 6.2: 거래 취소 응답 핸들러
   socket.on('tx:respond_cancel', (requestId: string, approve: boolean, callback) => {
     try {
-      const roomId = getRoomId();
+      const roomId = getRoomId(socket.id);
       if (!roomId) {
         return callback({ success: false, error: '방을 찾을 수 없습니다' });
       }

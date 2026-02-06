@@ -57,6 +57,7 @@ import { registerTransactionHandlers } from './handlers/transaction.handler.js';
 import { registerVoteHandlers } from './handlers/vote.handler.js';
 import { registerConnectionHandlers } from './handlers/connection.handler.js';
 import { connectionService } from './services/connection.service.js';
+import { SESSION_CLEANUP_INTERVAL_MS } from './utils/constants.js';
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -78,7 +79,7 @@ setInterval(() => {
   if (cleaned > 0) {
     console.log(`Cleaned up ${cleaned} expired sessions`);
   }
-}, 60 * 1000);
+}, SESSION_CLEANUP_INTERVAL_MS);
 
 export default app;
 

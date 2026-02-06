@@ -2,6 +2,8 @@ import type { Vote, VoteStatus, GameEndVote, BankReceiveReason } from '@blue-ban
 import { store } from '../models/store.js';
 import { randomUUID } from 'crypto';
 import { transactionService } from './transaction.service.js';
+import { VOTE_TIMEOUT_MS } from '../utils/constants.js';
+import { timerManager } from '../utils/timer-manager.js';
 
 export class VoteService {
   
@@ -31,7 +33,7 @@ export class VoteService {
       status: 'IN_PROGRESS',
       votes: {},
       createdAt: Date.now(),
-      expiresAt: Date.now() + 60000 // 1 min timeout?
+      expiresAt: Date.now() + VOTE_TIMEOUT_MS // 1 min timeout?
     };
 
     // Auto-vote yes for requester? Usually yes.
@@ -90,12 +92,8 @@ export class VoteService {
   private finalizeVote(vote: Vote, status: VoteStatus) {
     vote.status = status;
 
-    // 타임아웃 타이머 정리
-    const timeoutId = store.voteTimeouts.get(vote.id);
-    if (timeoutId) {
-        clearTimeout(timeoutId);
-        store.voteTimeouts.delete(vote.id);
-    }
+    // TimerManager로 타이머 정리
+    timerManager.clear(`${vote.roomId}:vote:${vote.id}`);
 
     if (status === 'APPROVED') {
         // Task 5.1: 투표 유형에 따라 분기 처리
@@ -170,7 +168,7 @@ export class VoteService {
       status: 'IN_PROGRESS',
       votes: {},
       createdAt: Date.now(),
-      expiresAt: Date.now() + 60000,
+      expiresAt: Date.now() + VOTE_TIMEOUT_MS,
       timeoutHandledAs: 'REJECT',
       reason: reason === 'OTHER' ? (customReason || 'OTHER') : reason
     };
@@ -207,7 +205,7 @@ export class VoteService {
       status: 'IN_PROGRESS',
       votes: {},
       createdAt: Date.now(),
-      expiresAt: Date.now() + 60000, // T054: 60초 타임아웃
+      expiresAt: Date.now() + VOTE_TIMEOUT_MS, // T054: 60초 타임아웃
       timeoutHandledAs: 'REJECT'  // FR-009-1: 미응답 시 거절로 처리 (기존 'APPROVE'에서 변경)
     };
 

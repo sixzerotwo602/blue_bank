@@ -2,23 +2,18 @@ import { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, BankReceiveReason } from '@blue-banker/shared';
 import { voteService } from '../services/vote.service.js';
 import { store } from '../models/store.js';
+import { getRoomId } from '../utils/helpers.js';
+import { VOTE_TIMEOUT_MS } from '../utils/constants.js';
+import { timerManager } from '../utils/timer-manager.js';
 
 export const registerVoteHandlers = (
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   socket: Socket<ClientToServerEvents, ServerToClientEvents>
 ) => {
-  const getRoomId = () => {
-     for (const room of store.rooms.values()) {
-        if (room.players.some(p => p.id === socket.id)) {
-            return room.id;
-        }
-     }
-     return null;
-  };
 
   socket.on('vote:request_fund', (_amount: number) => {
     try {
-        const roomId = getRoomId();
+        const roomId = getRoomId(socket.id);
         if (!roomId) throw new Error('방을 찾을 수 없습니다');
 
         // T015: Use full amount
@@ -30,8 +25,8 @@ export const registerVoteHandlers = (
 
         const vote = voteService.createVote(roomId, socket.id, fullAmount);
 
-        // FR-023: 60초 타임아웃 타이머 등록
-        const timeoutId = setTimeout(() => {
+        // FR-023: 투표 타임아웃 타이머 등록 (TimerManager)
+        timerManager.set(`${roomId}:vote:${vote.id}`, () => {
             const result = voteService.processWelfareVoteTimeout(vote.id);
             if (result) {
                 io.to(roomId).emit('vote:ended', result);
@@ -40,9 +35,7 @@ export const registerVoteHandlers = (
                     io.to(roomId).emit('room:sync', updatedRoom);
                 }
             }
-            store.voteTimeouts.delete(vote.id);
-        }, 60000);
-        store.voteTimeouts.set(vote.id, timeoutId);
+        }, VOTE_TIMEOUT_MS);
 
         io.to(roomId).emit('vote:started', vote);
         io.to(roomId).emit('vote:updated', vote); // Initial state
@@ -65,12 +58,8 @@ export const registerVoteHandlers = (
 
         // If ended, emit ended and room sync (since money changed)
         if (vote.status !== 'IN_PROGRESS') {
-             // FR-023: 타이머 정리 (finalizeVote에서도 처리하지만 명시적으로)
-             const timeoutId = store.voteTimeouts.get(vote.id);
-             if (timeoutId) {
-                 clearTimeout(timeoutId);
-                 store.voteTimeouts.delete(vote.id);
-             }
+             // TimerManager로 타이머 정리
+             timerManager.clear(`${vote.roomId}:vote:${vote.id}`);
 
              // 투표 유형에 따라 적절한 이벤트 전송
              if (vote.voteType === 'BANK_RECEIVE') {
@@ -93,7 +82,7 @@ export const registerVoteHandlers = (
   // Task 5.2: 은행 수령 투표 요청 핸들러
   socket.on('vote:request_bank_receive', (payload: { amount: number; reason: BankReceiveReason; customReason?: string }, callback) => {
     try {
-        const roomId = getRoomId();
+        const roomId = getRoomId(socket.id);
         if (!roomId) {
             return callback({ success: false, error: '방을 찾을 수 없습니다' });
         }
@@ -113,8 +102,8 @@ export const registerVoteHandlers = (
 
         const vote = voteService.createBankReceiveVote(roomId, socket.id, amount, reason, customReason);
 
-        // 60초 타임아웃 설정
-        const timeoutId = setTimeout(() => {
+        // 투표 타임아웃 타이머 등록 (TimerManager)
+        timerManager.set(`${roomId}:vote:${vote.id}`, () => {
             const result = voteService.processWelfareVoteTimeout(vote.id);
             if (result) {
                 io.to(roomId).emit('bank_receive_vote:ended', result);
@@ -123,9 +112,7 @@ export const registerVoteHandlers = (
                     io.to(roomId).emit('room:sync', updatedRoom);
                 }
             }
-            store.voteTimeouts.delete(vote.id);
-        }, 60000);
-        store.voteTimeouts.set(vote.id, timeoutId);
+        }, VOTE_TIMEOUT_MS);
 
         io.to(roomId).emit('bank_receive_vote:started', vote);
         callback({ success: true, voteId: vote.id });

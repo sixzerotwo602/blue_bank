@@ -31,6 +31,15 @@ class NotificationService {
     }
 
     store.notifications.set(notification.id, notification);
+
+    // playerNotifications 인덱스 갱신
+    let notifSet = store.playerNotifications.get(targetPlayerId);
+    if (!notifSet) {
+      notifSet = new Set();
+      store.playerNotifications.set(targetPlayerId, notifSet);
+    }
+    notifSet.add(notification.id);
+
     return notification;
   }
 

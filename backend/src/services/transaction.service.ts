@@ -1,6 +1,16 @@
-import type { Transaction, TransactionType, Asset, CancelRequest } from '@blue-banker/shared';
+import type { Transaction, TransactionType, Asset, CancelRequest, Room, Player } from '@blue-banker/shared';
 import { store } from '../models/store.js';
 import { randomUUID } from 'crypto';
+import { CANCEL_REQUEST_TIMEOUT_MS, CANCEL_TIME_LIMIT_MS } from '../utils/constants.js';
+
+/** private 메서드의 공통 반환 타입 */
+interface TransactionResult {
+  fromId: string | 'BANK' | 'FUND';
+  toId: string | 'BANK' | 'FUND';
+  txDescription?: string;
+  /** SELL_ASSET에서 실제 매각 금액으로 amount를 덮어쓸 때 사용 */
+  overrideAmount?: number;
+}
 
 export class TransactionService {
   processTransaction(
@@ -30,214 +40,49 @@ export class TransactionService {
       throw new Error('금액은 0보다 커야 합니다');
     }
 
-    let fromId: string | 'BANK' | 'FUND' = requesterId;
-    let toId: string | 'BANK' | 'FUND' = 'BANK';
-    let txDescription: string | undefined;
+    // 거래 유형별 디스패치
+    let result: TransactionResult;
 
     switch (payload.type) {
-      case 'TRANSFER': {
-        if (!payload.toId) throw new Error('받는 사람을 선택해주세요');
-        const recipient = room.players.find(p => p.id === payload.toId);
-        if (!recipient) throw new Error('받는 사람을 찾을 수 없습니다');
-        
-        if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
-        
-        player.cash -= payload.amount;
-        recipient.cash += payload.amount;
-        
-        fromId = player.id;
-        toId = recipient.id;
+      case 'TRANSFER':
+        result = this.processTransfer(room, player, payload as { type: TransactionType; amount: number; toId?: string });
         break;
-      }
-
-      case 'BUY_ASSET': {
-        if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
-        const type = payload.assetType || 'LAND';
-        const buildingType = type === 'BUILDING' ? (payload.buildingType || 'BUILDING') : undefined;
-
-        let name: string;
-        let description: string | undefined;
-
-        if (type === 'LAND') {
-          // T021: 토지 매입 - 사용자 입력 토지명 사용
-          name = payload.landName?.trim() || `토지 #${player.assets.filter(a => a.type === 'LAND').length + 1}`;
-          description = `토지 '${name}' 매입`;
-        } else {
-          // T022-T023: 건물 매입 - 선택한 토지 위에 건물 생성
-          const selectedLand = player.assets.find(a => a.id === payload.selectedLandId);
-          const landNameStr = selectedLand?.name || '토지';
-
-          switch (buildingType) {
-            case 'HOTEL':
-              name = `${landNameStr} 호텔`;
-              description = `'${landNameStr}' 토지 위에 호텔 건설`;
-              break;
-            case 'VILLA': {
-              // 별장 번호 계산 (같은 토지 위 별장 개수 + 1)
-              const villaCount = payload.villaCount || 1;
-              const existingVillasOnLand = player.assets.filter(
-                a => a.buildingType === 'VILLA' && a.name?.startsWith(`${landNameStr} 별장`)
-              ).length;
-              name = `${landNameStr} 별장${existingVillasOnLand + 1}`;
-              description = `'${landNameStr}' 토지 위에 별장 ${villaCount}개 건설`;
-              break;
-            }
-            default:
-              name = `${landNameStr} 빌딩`;
-              description = `'${landNameStr}' 토지 위에 빌딩 건설`;
-              break;
-          }
-        }
-
-        player.cash -= payload.amount;
-        player.assetValue += payload.amount;
-        const newAsset: Asset = {
-            id: randomUUID(),
-            type,
-            name,
-            value: payload.amount,
-            createdAt: Date.now()
-        };
-        // T004: Store building type only when defined
-        if (buildingType) {
-            newAsset.buildingType = buildingType;
-        }
-        // Task 4.2 fix: 건물 생성 시 landId 연결
-        if (type === 'BUILDING' && payload.selectedLandId) {
-            newAsset.landId = payload.selectedLandId;
-        }
-        player.assets.push(newAsset);
-
-        fromId = player.id;
-        toId = 'BANK';
-        txDescription = description;
+      case 'BUY_ASSET':
+        result = this.processBuyAsset(room, player, payload as { type: TransactionType; amount: number; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; landName?: string; selectedLandId?: string; villaCount?: number });
         break;
-      }
-
+      case 'SELL_ASSET':
+        result = this.processSellAsset(room, player, payload as { type: TransactionType; amount: number; toId?: string; bundleSell?: boolean });
+        break;
       case 'PAY_COST':
-        if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
-        player.cash -= payload.amount;
-        fromId = player.id;
-        toId = 'BANK';
+        result = this.processPayCost(room, player, payload as { type: TransactionType; amount: number });
         break;
-
       case 'DONATE':
-        if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
-        player.cash -= payload.amount;
-        room.welfareFund += payload.amount;
-        fromId = player.id;
-        toId = 'FUND';
+        result = this.processDonate(room, player, payload as { type: TransactionType; amount: number });
         break;
-
       case 'SALARY':
-        player.cash += payload.amount;
-        fromId = 'BANK';
-        toId = player.id;
+        result = this.processSalary(room, player, payload as { type: TransactionType; amount: number });
         break;
-
       case 'WELFARE_RECEIVE':
-          // Allowing direct receive for now if client requests it (e.g. dev mode or simplified)
-          // Ideally this comes from VoteService.
-          if (room.welfareFund < payload.amount) throw new Error('복지기금이 부족합니다');
-          room.welfareFund -= payload.amount;
-          player.cash += payload.amount;
-          fromId = 'FUND';
-          toId = player.id;
-          break;
-
-      // T014: 은행 수령 (복권, 우승상금, 보너스 등) - 개인화
-      // 모든 플레이어가 본인 계좌로 직접 수령 가능
-      case 'BANK_RECEIVE': {
-        // 본인 계좌로만 수령 가능 (toId가 있더라도 본인만 허용)
-        const targetId = payload.toId || requesterId;
-        if (targetId !== requesterId) {
-          throw new Error('본인 계좌로만 수령할 수 있습니다');
-        }
-
-        player.cash += payload.amount;
-        fromId = 'BANK';
-        toId = player.id;
-        
-        // T008: reason에 따른 한글 상세 설명 생성
-        const reasonLabels: Record<string, string> = {
-          LOTTERY: '복권 당첨',
-          PRIZE: '우승 상금',
-          BONUS: '보너스',
-          OTHER: '기타'
-        };
-        const reasonLabel = reasonLabels[payload.reason || ''] || '은행 지급';
-        txDescription = reasonLabel;
+        result = this.processWelfareReceive(room, player, payload as { type: TransactionType; amount: number });
         break;
-      }
-
-      // T044: 자산 매각 (50% 현금화)
-      // Task 4.2: bundleSell 옵션으로 토지+건물 일괄 매각
-      case 'SELL_ASSET': {
-        if (!payload.toId) throw new Error('매각할 자산을 선택해주세요');
-        const assetIndex = player.assets.findIndex(a => a.id === payload.toId);
-        if (assetIndex === -1) throw new Error('자산을 찾을 수 없습니다');
-
-        const asset = player.assets[assetIndex]!;
-        let totalValue = asset.value;
-        const soldAssetNames: string[] = [asset.name || '자산'];
-
-        // Task 4.2: 토지 매각 시 건물 일괄 처리
-        if (asset.type === 'LAND' && payload.bundleSell) {
-          // 토지 위의 모든 건물 찾기
-          const buildingsOnLand = player.assets.filter(
-            a => a.type === 'BUILDING' && a.landId === asset.id
-          );
-
-          // 건물 가치 합산 및 이름 수집
-          for (const building of buildingsOnLand) {
-            totalValue += building.value;
-            soldAssetNames.push(building.name || '건물');
-          }
-
-          // 건물 먼저 제거 (역순으로 제거하여 인덱스 문제 방지)
-          const buildingIds = buildingsOnLand.map(b => b.id);
-          player.assets = player.assets.filter(a => !buildingIds.includes(a.id));
-        }
-
-        const sellPrice = Math.floor(totalValue * 0.5); // 50% 현금화
-
-        // 자산 제거 (토지 또는 단일 자산)
-        const updatedAssetIndex = player.assets.findIndex(a => a.id === payload.toId);
-        if (updatedAssetIndex !== -1) {
-          player.assets.splice(updatedAssetIndex, 1);
-        }
-        player.assetValue -= totalValue;
-
-        // 현금 지급
-        player.cash += sellPrice;
-
-        fromId = player.id;
-        toId = 'BANK';
-
-        // 실제 매각 금액으로 payload.amount 업데이트 (거래 기록용)
-        payload.amount = sellPrice;
-
-        // 매각 내역 설명 생성
-        if (soldAssetNames.length > 1) {
-          txDescription = `'${soldAssetNames[0]}' 외 ${soldAssetNames.length - 1}건 일괄 매각 (원가: ${totalValue}원)`;
-        } else {
-          txDescription = `'${asset.name}' 매각 (원가: ${asset.value}원)`;
-        }
+      case 'BANK_RECEIVE':
+        result = this.processBankReceive(room, player, payload as { type: TransactionType; amount: number; toId?: string; reason?: string }, requesterId);
         break;
-      }
-
       default:
         throw new Error('잘못된 거래 유형입니다');
     }
 
+    // SELL_ASSET에서 실제 매각 금액으로 덮어쓰기
+    const finalAmount = result.overrideAmount !== undefined ? result.overrideAmount : payload.amount;
+
     const transaction: Transaction = {
       id: randomUUID(),
       type: payload.type,
-      amount: payload.amount,
-      fromId,
-      toId,
+      amount: finalAmount,
+      fromId: result.fromId,
+      toId: result.toId,
       timestamp: Date.now(),
-      description: txDescription || payload.type,
+      description: result.txDescription || payload.type,
       status: 'COMPLETED', // 기본 상태
       // T008: BANK_RECEIVE인 경우 reason 저장
       ...(payload.type === 'BANK_RECEIVE' && payload.reason ? { reason: payload.reason } : {})
@@ -245,16 +90,235 @@ export class TransactionService {
 
     store.transactions.set(transaction.id, transaction);
 
+    // roomTransactions 인덱스 갱신
+    let txSet = store.roomTransactions.get(roomId);
+    if (!txSet) {
+      txSet = new Set();
+      store.roomTransactions.set(roomId, txSet);
+    }
+    txSet.add(transaction.id);
+
     return transaction;
+  }
+
+  /** 플레이어 간 송금 */
+  private processTransfer(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number; toId?: string }
+  ): TransactionResult {
+    if (!payload.toId) throw new Error('받는 사람을 선택해주세요');
+    const recipient = room.players.find(p => p.id === payload.toId);
+    if (!recipient) throw new Error('받는 사람을 찾을 수 없습니다');
+
+    if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
+
+    player.cash -= payload.amount;
+    recipient.cash += payload.amount;
+
+    return { fromId: player.id, toId: recipient.id };
+  }
+
+  /** 부동산 매입 */
+  private processBuyAsset(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; landName?: string; selectedLandId?: string; villaCount?: number }
+  ): TransactionResult {
+    if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
+    const type = payload.assetType || 'LAND';
+    const buildingType = type === 'BUILDING' ? (payload.buildingType || 'BUILDING') : undefined;
+
+    let name: string;
+    let description: string | undefined;
+
+    if (type === 'LAND') {
+      // T021: 토지 매입 - 사용자 입력 토지명 사용
+      name = payload.landName?.trim() || `토지 #${player.assets.filter(a => a.type === 'LAND').length + 1}`;
+      description = `토지 '${name}' 매입`;
+    } else {
+      // T022-T023: 건물 매입 - 선택한 토지 위에 건물 생성
+      const selectedLand = player.assets.find(a => a.id === payload.selectedLandId);
+      const landNameStr = selectedLand?.name || '토지';
+
+      switch (buildingType) {
+        case 'HOTEL':
+          name = `${landNameStr} 호텔`;
+          description = `'${landNameStr}' 토지 위에 호텔 건설`;
+          break;
+        case 'VILLA': {
+          // 별장 번호 계산 (같은 토지 위 별장 개수 + 1)
+          const villaCount = payload.villaCount || 1;
+          const existingVillasOnLand = player.assets.filter(
+            a => a.buildingType === 'VILLA' && a.name?.startsWith(`${landNameStr} 별장`)
+          ).length;
+          name = `${landNameStr} 별장${existingVillasOnLand + 1}`;
+          description = `'${landNameStr}' 토지 위에 별장 ${villaCount}개 건설`;
+          break;
+        }
+        default:
+          name = `${landNameStr} 빌딩`;
+          description = `'${landNameStr}' 토지 위에 빌딩 건설`;
+          break;
+      }
+    }
+
+    player.cash -= payload.amount;
+    player.assetValue += payload.amount;
+    const newAsset: Asset = {
+        id: randomUUID(),
+        type,
+        name,
+        value: payload.amount,
+        createdAt: Date.now()
+    };
+    // T004: Store building type only when defined
+    if (buildingType) {
+        newAsset.buildingType = buildingType;
+    }
+    // Task 4.2 fix: 건물 생성 시 landId 연결
+    if (type === 'BUILDING' && payload.selectedLandId) {
+        newAsset.landId = payload.selectedLandId;
+    }
+    player.assets.push(newAsset);
+
+    return { fromId: player.id, toId: 'BANK', txDescription: description };
+  }
+
+  /** 자산 매각 (50% 현금화) */
+  private processSellAsset(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number; toId?: string; bundleSell?: boolean }
+  ): TransactionResult {
+    if (!payload.toId) throw new Error('매각할 자산을 선택해주세요');
+    const assetIndex = player.assets.findIndex(a => a.id === payload.toId);
+    if (assetIndex === -1) throw new Error('자산을 찾을 수 없습니다');
+
+    const asset = player.assets[assetIndex];
+    if (!asset) throw new Error('자산을 찾을 수 없습니다');
+    let totalValue = asset.value;
+    const soldAssetNames: string[] = [asset.name || '자산'];
+
+    // Task 4.2: 토지 매각 시 건물 일괄 처리
+    if (asset.type === 'LAND' && payload.bundleSell) {
+      // 토지 위의 모든 건물 찾기
+      const buildingsOnLand = player.assets.filter(
+        a => a.type === 'BUILDING' && a.landId === asset.id
+      );
+
+      // 건물 가치 합산 및 이름 수집
+      for (const building of buildingsOnLand) {
+        totalValue += building.value;
+        soldAssetNames.push(building.name || '건물');
+      }
+
+      // 건물 먼저 제거 (역순으로 제거하여 인덱스 문제 방지)
+      const buildingIds = buildingsOnLand.map(b => b.id);
+      player.assets = player.assets.filter(a => !buildingIds.includes(a.id));
+    }
+
+    const sellPrice = Math.floor(totalValue * 0.5); // 50% 현금화
+
+    // 자산 제거 (토지 또는 단일 자산)
+    const updatedAssetIndex = player.assets.findIndex(a => a.id === payload.toId);
+    if (updatedAssetIndex !== -1) {
+      player.assets.splice(updatedAssetIndex, 1);
+    }
+    player.assetValue -= totalValue;
+
+    // 현금 지급
+    player.cash += sellPrice;
+
+    // 매각 내역 설명 생성
+    let txDescription: string;
+    if (soldAssetNames.length > 1) {
+      txDescription = `'${soldAssetNames[0]}' 외 ${soldAssetNames.length - 1}건 일괄 매각 (원가: ${totalValue}원)`;
+    } else {
+      txDescription = `'${asset.name}' 매각 (원가: ${asset.value}원)`;
+    }
+
+    return { fromId: player.id, toId: 'BANK', txDescription, overrideAmount: sellPrice };
+  }
+
+  /** 은행에 비용 납부 */
+  private processPayCost(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number }
+  ): TransactionResult {
+    if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
+    player.cash -= payload.amount;
+    return { fromId: player.id, toId: 'BANK' };
+  }
+
+  /** 복지기금 기부 */
+  private processDonate(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number }
+  ): TransactionResult {
+    if (player.cash < payload.amount) throw new Error('잔액이 부족합니다');
+    player.cash -= payload.amount;
+    room.welfareFund += payload.amount;
+    return { fromId: player.id, toId: 'FUND' };
+  }
+
+  /** 월급 수령 */
+  private processSalary(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number }
+  ): TransactionResult {
+    player.cash += payload.amount;
+    return { fromId: 'BANK', toId: player.id };
+  }
+
+  /** 복지기금 수령 */
+  private processWelfareReceive(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number }
+  ): TransactionResult {
+    // Allowing direct receive for now if client requests it (e.g. dev mode or simplified)
+    // Ideally this comes from VoteService.
+    if (room.welfareFund < payload.amount) throw new Error('복지기금이 부족합니다');
+    room.welfareFund -= payload.amount;
+    player.cash += payload.amount;
+    return { fromId: 'FUND', toId: player.id };
+  }
+
+  /** 은행 수령 (복권, 우승상금, 보너스 등) */
+  private processBankReceive(
+    room: Room,
+    player: Player,
+    payload: { type: TransactionType; amount: number; toId?: string; reason?: string },
+    requesterId: string
+  ): TransactionResult {
+    // 본인 계좌로만 수령 가능 (toId가 있더라도 본인만 허용)
+    const targetId = payload.toId || requesterId;
+    if (targetId !== requesterId) {
+      throw new Error('본인 계좌로만 수령할 수 있습니다');
+    }
+
+    player.cash += payload.amount;
+
+    // T008: reason에 따른 한글 상세 설명 생성
+    const reasonLabels: Record<string, string> = {
+      LOTTERY: '복권 당첨',
+      PRIZE: '우승 상금',
+      BONUS: '보너스',
+      OTHER: '기타'
+    };
+    const reasonLabel = reasonLabels[payload.reason || ''] || '은행 지급';
+
+    return { fromId: 'BANK', toId: player.id, txDescription: reasonLabel };
   }
 
   // Task 6.1: 거래 조회
   getTransaction(transactionId: string): Transaction | undefined {
     return store.transactions.get(transactionId);
   }
-
-  // 거래 취소 가능 시간 제한 (2분 = 120초 = 120000ms)
-  private readonly CANCEL_TIME_LIMIT_MS = 120000;
 
   // 복지기금 락 조건: WELFARE_RECEIVE 거래가 한 번이라도 있는지 확인
   private hasAnyWelfarePayout(): boolean {
@@ -282,7 +346,7 @@ export class TransactionService {
 
     // 시간 제한 검증: 거래 발생 후 2분 이내만 취소 가능
     const elapsed = Date.now() - transaction.timestamp;
-    if (elapsed > this.CANCEL_TIME_LIMIT_MS) {
+    if (elapsed > CANCEL_TIME_LIMIT_MS) {
       return { error: '거래 취소 가능 시간이 만료되었습니다 (2분 초과)' };
     }
 
@@ -340,8 +404,8 @@ export class TransactionService {
 
     // 취소 요청 생성 (상대방 동의 필요, 60초 대기)
     // 단, 거래 취소 가능 시간 내에 완료되어야 함
-    const remainingTime = this.CANCEL_TIME_LIMIT_MS - elapsed;
-    const expiresIn = Math.min(60000, remainingTime); // 60초 또는 남은 시간 중 짧은 것
+    const remainingTime = CANCEL_TIME_LIMIT_MS - elapsed;
+    const expiresIn = Math.min(CANCEL_REQUEST_TIMEOUT_MS, remainingTime);
 
     const request: CancelRequest = {
       id: randomUUID(),

@@ -1,14 +1,8 @@
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, DisconnectedSession, ConnectionStatus, Room, Player } from '@blue-banker/shared';
 import { store } from '../models/store.js';
-
-// Grace period: 5 minutes
-const GRACE_PERIOD_MS = 5 * 60 * 1000;
-// Host migration delay: 2 minutes
-const HOST_MIGRATION_DELAY_MS = 2 * 60 * 1000;
-
-// Host migration timers (roomId -> timeout)
-const hostMigrationTimers: Map<string, NodeJS.Timeout> = new Map();
+import { SESSION_EXPIRY_MS, HOST_MIGRATION_DELAY_MS, KICK_GRACE_PERIOD_MS } from '../utils/constants.js';
+import { timerManager } from '../utils/timer-manager.js';
 
 /**
  * Connection Service - Manages player connection states and session recovery
@@ -30,7 +24,6 @@ export const connectionService = {
     if (!player) return;
 
     player.connectionStatus = status;
-    player.lastSeenAt = Date.now();
 
     if (status === 'OFFLINE') {
       player.disconnectedAt = Date.now();
@@ -57,7 +50,7 @@ export const connectionService = {
       assetValue: player.assetValue,
       assets: [...player.assets],
       disconnectedAt: Date.now(),
-      expiresAt: Date.now() + GRACE_PERIOD_MS,
+      expiresAt: Date.now() + SESSION_EXPIRY_MS,
       originalSocketId: player.id
     };
 
@@ -85,47 +78,45 @@ export const connectionService = {
 
   /**
    * Restore session for reconnecting player (T025)
+   * room.players에서 기존 OFFLINE 플레이어를 직접 재활성화 (스냅샷 대신 실시간 데이터 사용)
    */
   restoreSession(roomId: string, nickname: string, newSocketId: string): Player | null {
-    const session = this.findDisconnectedSession(roomId, nickname);
-    if (!session) return null;
-
     const room = store.rooms.get(roomId);
     if (!room) return null;
 
-    // Create restored player
-    const restoredPlayer: Player = {
-      id: newSocketId,
-      nickname: session.nickname,
-      cash: session.cash,
-      assetValue: session.assetValue,
-      assets: session.assets,
-      roomId,
-      isReady: true,
-      isHost: room.hostId === session.originalSocketId,
-      connected: true,
-      connectionStatus: 'ONLINE',
-      lastSeenAt: Date.now(),
-      disconnectedAt: null
-    };
+    // room.players에서 nickname으로 기존 OFFLINE 플레이어를 찾는다
+    const existingPlayer = room.players.find(
+      p => p.nickname === nickname && p.connectionStatus === 'OFFLINE'
+    );
+    if (!existingPlayer) return null;
+
+    const oldSocketId = existingPlayer.id;
+
+    // 기존 플레이어의 id를 새 socket.id로 교체
+    existingPlayer.id = newSocketId;
+    existingPlayer.connectionStatus = 'ONLINE';
+    existingPlayer.connected = true;
+    existingPlayer.disconnectedAt = null;
 
     // Update host ID if this was the host
-    if (room.hostId === session.originalSocketId) {
+    if (room.hostId === oldSocketId) {
       room.hostId = newSocketId;
     }
 
-    // Remove old player entry and add restored one
-    room.players = room.players.filter(p => p.nickname !== nickname);
-    room.players.push(restoredPlayer);
+    // T026: playerToRoom 인덱스 갱신 (구 socket.id 삭제 → 새 socket.id 등록)
+    store.playerToRoom.delete(oldSocketId);
+    store.playerToRoom.set(newSocketId, roomId);
 
     // Remove session from storage
     store.disconnectedSessions.delete(`${roomId}:${nickname}`);
 
-    return restoredPlayer;
+    return existingPlayer;
   },
 
   /**
    * Cleanup expired sessions (T026)
+   * LOBBY/ENDED 상태 방에서는 OFFLINE 플레이어를 room.players에서 동기 제거
+   * PLAYING 상태에서는 OFFLINE 유지 (호스트 킥 위임)
    */
   cleanupExpiredSessions(): number {
     const now = Date.now();
@@ -135,6 +126,40 @@ export const connectionService = {
       if (session.expiresAt <= now) {
         store.disconnectedSessions.delete(key);
         cleaned++;
+
+        // LOBBY/ENDED 상태 방에서는 해당 OFFLINE 플레이어를 room.players에서 제거
+        const room = store.rooms.get(session.roomId);
+        if (room && (room.status === 'LOBBY' || room.status === 'ENDED')) {
+          const playerIndex = room.players.findIndex(
+            p => p.nickname === session.nickname && p.connectionStatus === 'OFFLINE'
+          );
+          if (playerIndex !== -1) {
+            const player = room.players[playerIndex];
+            if (player) {
+              store.playerToRoom.delete(player.id);
+              store.playerNotifications.delete(player.id);
+            }
+            room.players.splice(playerIndex, 1);
+          }
+
+          // 빈 방 자동 정리
+          if (room.players.length === 0) {
+            store.cleanupRoom(room.id);
+          }
+        }
+
+        // PLAYING 상태 방에서 모든 플레이어가 OFFLINE이고 세션이 전부 만료되면 방 자동 정리
+        if (room && room.status === 'PLAYING') {
+          const allOffline = room.players.every(p => p.connectionStatus === 'OFFLINE');
+          if (allOffline) {
+            // 해당 방의 세션이 남아있는지 확인
+            const hasRemainingSession = Array.from(store.disconnectedSessions.values())
+              .some(s => s.roomId === session.roomId && s.expiresAt > now);
+            if (!hasRemainingSession) {
+              store.cleanupRoom(room.id);
+            }
+          }
+        }
       }
     }
 
@@ -160,23 +185,18 @@ export const connectionService = {
       remainingSeconds: HOST_MIGRATION_DELAY_MS / 1000
     });
 
-    // Set timer for host migration
-    const timer = setTimeout(() => {
+    // Set timer for host migration (TimerManager)
+    timerManager.set(`${room.id}:host-migration`, () => {
       this.migrateHost(io, room);
-      hostMigrationTimers.delete(room.id);
     }, HOST_MIGRATION_DELAY_MS);
-
-    hostMigrationTimers.set(room.id, timer);
   },
 
   /**
    * Cancel host migration timer (T035)
    */
   cancelHostMigrationTimer(roomId: string): boolean {
-    const timer = hostMigrationTimers.get(roomId);
-    if (timer) {
-      clearTimeout(timer);
-      hostMigrationTimers.delete(roomId);
+    if (timerManager.has(`${roomId}:host-migration`)) {
+      timerManager.clear(`${roomId}:host-migration`);
 
       const room = store.rooms.get(roomId);
       if (room) {
@@ -195,6 +215,12 @@ export const connectionService = {
     io: Server<ClientToServerEvents, ServerToClientEvents>,
     room: Room
   ): boolean {
+    // 방 존재 여부 확인 (타이머 콜백 시 이미 삭제되었을 수 있음)
+    if (!store.rooms.has(room.id)) {
+      timerManager.clearByPrefix(`${room.id}:`);
+      return false;
+    }
+
     const oldHostId = room.hostId;
 
     // Find next host based on join order (first online player who isn't the old host)
@@ -247,7 +273,7 @@ export const connectionService = {
     if (!player.disconnectedAt) return false;
 
     const offlineTime = Date.now() - player.disconnectedAt;
-    return offlineTime >= GRACE_PERIOD_MS; // 5 minutes
+    return offlineTime >= KICK_GRACE_PERIOD_MS;
   },
 
   /**
@@ -268,6 +294,10 @@ export const connectionService = {
     // Remove player from room (assets are deleted - 자산 말소)
     room.players = room.players.filter(p => p.id !== playerId);
 
+    // 인덱스 정리
+    store.playerToRoom.delete(playerId);
+    store.playerNotifications.delete(playerId);
+
     // Remove any pending session
     store.disconnectedSessions.delete(`${room.id}:${nickname}`);
 
@@ -279,6 +309,11 @@ export const connectionService = {
 
     // Sync room state
     io.to(room.id).emit('room:sync', room);
+
+    // 방에 플레이어가 0명이면 즉시 정리
+    if (room.players.length === 0) {
+      store.cleanupRoom(room.id);
+    }
 
     return true;
   }

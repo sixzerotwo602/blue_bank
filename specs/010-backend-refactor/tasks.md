@@ -19,9 +19,9 @@
 
 **Purpose**: 신규 유틸리티 모듈 생성 (후속 모든 리팩토링의 토대)
 
-- [ ] T001 [P] 백엔드에서 사용하는 모든 매직넘버(60000, 120000, 300000 등)를 추출하여 backend/src/utils/constants.ts에 중앙 상수로 정의 (VOTE_TIMEOUT_MS, CANCEL_REQUEST_TIMEOUT_MS, HOST_MIGRATION_DELAY_MS, SESSION_EXPIRY_MS, ROOM_CLEANUP_DELAY_MS, SESSION_CLEANUP_INTERVAL_MS, KICK_GRACE_PERIOD_MS, INITIAL_CASH 등)
-- [ ] T002 [P] getRoomId()와 formatManwon() 공통 함수를 backend/src/utils/helpers.ts에 생성. getRoomId는 초기에는 기존 순회 방식으로 구현하되 Phase 3에서 인덱스 기반으로 전환할 수 있도록 설계
-- [ ] T003 [P] TimerManager 클래스를 backend/src/utils/timer-manager.ts에 구현. set(key, callback, delay), clear(key), clearByPrefix(prefix), has(key), clearAll() 메서드 포함. 싱글톤 인스턴스 export. 키 네이밍: `{roomId}:{타이머유형}:{식별자}`
+- [x] T001 [P] 백엔드에서 사용하는 모든 매직넘버(60000, 120000, 300000 등)를 추출하여 backend/src/utils/constants.ts에 중앙 상수로 정의 (VOTE_TIMEOUT_MS, CANCEL_REQUEST_TIMEOUT_MS, HOST_MIGRATION_DELAY_MS, SESSION_EXPIRY_MS, ROOM_CLEANUP_DELAY_MS, SESSION_CLEANUP_INTERVAL_MS, KICK_GRACE_PERIOD_MS, INITIAL_CASH 등)
+- [x] T002 [P] getRoomId()와 formatManwon() 공통 함수를 backend/src/utils/helpers.ts에 생성. getRoomId는 초기에는 기존 순회 방식으로 구현하되 Phase 3에서 인덱스 기반으로 전환할 수 있도록 설계
+- [x] T003 [P] TimerManager 클래스를 backend/src/utils/timer-manager.ts에 구현. set(key, callback, delay), clear(key), clearByPrefix(prefix), has(key), clearAll() 메서드 포함. 싱글톤 인스턴스 export. 키 네이밍: `{roomId}:{타이머유형}:{식별자}`
 
 ---
 
@@ -31,19 +31,19 @@
 
 **⚠️ CRITICAL**: 이 Phase 완료 전까지 다른 User Story 작업 불가
 
-- [ ] T004 [P] [US1] backend/src/handlers/connection.handler.ts에서 getRoomId() 로컬 정의를 삭제하고 helpers.ts의 getRoomId를 import하여 사용. 매직넘버를 constants.ts 상수로 교체
-- [ ] T005 [P] [US1] backend/src/handlers/transaction.handler.ts에서 getRoomId() 로컬 정의를 삭제하고 helpers.ts의 getRoomId를 import하여 사용. 매직넘버(60000 등)를 constants.ts 상수로 교체
-- [ ] T006 [P] [US1] backend/src/handlers/vote.handler.ts에서 getRoomId() 로컬 정의를 삭제하고 helpers.ts의 getRoomId를 import하여 사용. 매직넘버를 constants.ts 상수로 교체
-- [ ] T007 [P] [US1] backend/src/handlers/game.handler.ts에서 매직넘버를 constants.ts 상수로 교체
-- [ ] T008 [P] [US1] backend/src/services/connection.service.ts에서 HOST_MIGRATION_DELAY_MS, GRACE_PERIOD_MS 등 로컬 상수를 삭제하고 constants.ts import로 교체
-- [ ] T009 [P] [US1] backend/src/services/notification.service.ts에서 formatManwon 중복 정의가 있으면 helpers.ts import로 교체
-- [ ] T010 [US5] backend/src/handlers/vote.handler.ts에서 store.voteTimeouts 기반 타이머를 timerManager.set(`{roomId}:vote:{voteId}`, ...) 패턴으로 전환
-- [ ] T011 [US5] backend/src/services/connection.service.ts에서 hostMigrationTimers(모듈 레벨 Map) 기반 타이머를 timerManager.set(`{roomId}:host-migration`, ...) 패턴으로 전환
-- [ ] T012 [US5] backend/src/handlers/transaction.handler.ts에서 거래 취소 setTimeout을 timerManager.set(`{roomId}:cancel:{requestId}`, ...) 패턴으로 전환
-- [ ] T013 [US5] backend/src/handlers/game.handler.ts에서 게임 종료 투표 setTimeout을 timerManager.set(`{roomId}:vote:{voteId}`, ...) 패턴으로 전환
-- [ ] T014 [US5] backend/src/services/vote.service.ts에서 타이머 관련 코드(finalizeVote의 clearTimeout 등)를 timerManager.clear() 패턴으로 전환
-- [ ] T015 [US5] backend/src/models/store.ts에서 voteTimeouts Map을 삭제하고, reset() 메서드에서 timerManager.clearAll()을 호출하도록 변경
-- [ ] T016 backend/src/app.ts에서 session cleanup setInterval의 매직넘버를 constants.ts의 SESSION_CLEANUP_INTERVAL_MS로 교체
+- [x] T004 [P] [US1] backend/src/handlers/connection.handler.ts에서 getRoomId() 로컬 정의를 삭제하고 helpers.ts의 getRoomId를 import하여 사용. 매직넘버를 constants.ts 상수로 교체
+- [x] T005 [P] [US1] backend/src/handlers/transaction.handler.ts에서 getRoomId() 로컬 정의를 삭제하고 helpers.ts의 getRoomId를 import하여 사용. 매직넘버(60000 등)를 constants.ts 상수로 교체
+- [x] T006 [P] [US1] backend/src/handlers/vote.handler.ts에서 getRoomId() 로컬 정의를 삭제하고 helpers.ts의 getRoomId를 import하여 사용. 매직넘버를 constants.ts 상수로 교체
+- [x] T007 [P] [US1] backend/src/handlers/game.handler.ts에서 매직넘버를 constants.ts 상수로 교체
+- [x] T008 [P] [US1] backend/src/services/connection.service.ts에서 HOST_MIGRATION_DELAY_MS, GRACE_PERIOD_MS 등 로컬 상수를 삭제하고 constants.ts import로 교체
+- [x] T009 [P] [US1] backend/src/services/notification.service.ts에서 formatManwon 중복 정의가 있으면 helpers.ts import로 교체
+- [x] T010 [US5] backend/src/handlers/vote.handler.ts에서 store.voteTimeouts 기반 타이머를 timerManager.set(`{roomId}:vote:{voteId}`, ...) 패턴으로 전환
+- [x] T011 [US5] backend/src/services/connection.service.ts에서 hostMigrationTimers(모듈 레벨 Map) 기반 타이머를 timerManager.set(`{roomId}:host-migration`, ...) 패턴으로 전환
+- [x] T012 [US5] backend/src/handlers/transaction.handler.ts에서 거래 취소 setTimeout을 timerManager.set(`{roomId}:cancel:{requestId}`, ...) 패턴으로 전환
+- [x] T013 [US5] backend/src/handlers/game.handler.ts에서 게임 종료 투표 setTimeout을 timerManager.set(`{roomId}:vote:{voteId}`, ...) 패턴으로 전환
+- [x] T014 [US5] backend/src/services/vote.service.ts에서 타이머 관련 코드(finalizeVote의 clearTimeout 등)를 timerManager.clear() 패턴으로 전환
+- [x] T015 [US5] backend/src/models/store.ts에서 voteTimeouts Map을 삭제하고, reset() 메서드에서 timerManager.clearAll()을 호출하도록 변경
+- [x] T016 backend/src/app.ts에서 session cleanup setInterval의 매직넘버를 constants.ts의 SESSION_CLEANUP_INTERVAL_MS로 교체
 
 **Checkpoint**: 코드에 getRoomId/formatManwon 중복 0건, 매직넘버 0건, 모든 타이머가 TimerManager를 통해 관리됨. `npm run build` 성공 확인
 
@@ -55,13 +55,13 @@
 
 **Independent Test**: 인덱스 추가 전후로 모든 기능이 동일하게 동작하고, 대량 데이터에서 조회 성능 개선 확인
 
-- [ ] T017 [US2] backend/src/models/store.ts에 인덱스 Map 3개 추가: playerToRoom(Map<string, string>), roomTransactions(Map<string, Set<string>>), playerNotifications(Map<string, Set<string>>). reset()에 인덱스 초기화 추가
-- [ ] T018 [US2] backend/src/models/store.ts에 인덱스 기반 조회 메서드 추가: getPlayerRoom(playerId), getRoomTransactions(roomId), getPlayerNotifications(playerId)
-- [ ] T019 [US2] backend/src/services/room.service.ts에서 방 생성(createRoom) 시 playerToRoom 인덱스에 호스트 등록, 방 참가(joinRoom) 시 playerToRoom 인덱스에 플레이어 등록
-- [ ] T020 [US2] backend/src/services/transaction.service.ts에서 거래 생성 시 roomTransactions 인덱스에 거래 ID 추가. getPlayerTransactions()를 인덱스 기반으로 교체
-- [ ] T021 [US2] backend/src/services/notification.service.ts에서 알림 생성 시 playerNotifications 인덱스에 알림 ID 추가. getUnreadNotificationCount()를 인덱스 기반으로 교체
-- [ ] T022 [US2] backend/src/utils/helpers.ts의 getRoomId()를 store.playerToRoom.get(playerId) 인덱스 기반 O(1) 조회로 전환
-- [ ] T023 [US2] backend/src/services/connection.service.ts에서 disconnect 시 playerToRoom 인덱스 유지(OFFLINE), 킥 시 playerToRoom에서 삭제
+- [x] T017 [US2] backend/src/models/store.ts에 인덱스 Map 3개 추가: playerToRoom(Map<string, string>), roomTransactions(Map<string, Set<string>>), playerNotifications(Map<string, Set<string>>). reset()에 인덱스 초기화 추가
+- [x] T018 [US2] backend/src/models/store.ts에 인덱스 기반 조회 메서드 추가: getPlayerRoom(playerId), getRoomTransactions(roomId), getPlayerNotifications(playerId)
+- [x] T019 [US2] backend/src/services/room.service.ts에서 방 생성(createRoom) 시 playerToRoom 인덱스에 호스트 등록, 방 참가(joinRoom) 시 playerToRoom 인덱스에 플레이어 등록
+- [x] T020 [US2] backend/src/services/transaction.service.ts에서 거래 생성 시 roomTransactions 인덱스에 거래 ID 추가. getPlayerTransactions()를 인덱스 기반으로 교체
+- [x] T021 [US2] backend/src/services/notification.service.ts에서 알림 생성 시 playerNotifications 인덱스에 알림 ID 추가. getUnreadNotificationCount()를 인덱스 기반으로 교체
+- [x] T022 [US2] backend/src/utils/helpers.ts의 getRoomId()를 store.playerToRoom.get(playerId) 인덱스 기반 O(1) 조회로 전환
+- [x] T023 [US2] backend/src/services/connection.service.ts에서 disconnect 시 playerToRoom 인덱스 유지(OFFLINE), 킥 시 playerToRoom에서 삭제
 
 **Checkpoint**: 모든 조회가 인덱스 기반 O(1). 방 생성/참가/퇴장 시 인덱스 자동 갱신. `npm run build` 성공
 
@@ -73,16 +73,16 @@
 
 **Independent Test**: LOBBY/PLAYING/ENDED 모든 상태에서 disconnect→재접속이 정상 동작, 세션 만료 후 유령 0건
 
-- [ ] T024 [US7] backend/src/handlers/room.handler.ts에서 room:join 핸들러에 LOBBY 재접속 분기 추가: joinRoom() 실패 시 "Nickname taken" + 해당 닉네임 플레이어가 OFFLINE이면 connectionService.restoreSession() 호출
-- [ ] T025 [US7] backend/src/services/connection.service.ts의 restoreSession()을 스냅샷 기반에서 room.players 실시간 기반으로 변경: room.players에서 nickname으로 기존 OFFLINE 플레이어를 찾아 id를 새 socket.id로 교체, connectionStatus를 ONLINE으로 변경, disconnectedAt을 null로 설정
-- [ ] T026 [US7] backend/src/services/connection.service.ts의 restoreSession()에서 playerToRoom 인덱스 갱신 추가: 구 socket.id delete → 새 socket.id set
-- [ ] T027 [US7] backend/src/services/connection.service.ts의 cleanupExpiredSessions()에서 세션 만료 시 room.players 동기 제거 로직 추가: LOBBY/ENDED 상태 방에서는 해당 OFFLINE 플레이어를 room.players에서 제거 + playerToRoom 인덱스 삭제. PLAYING 상태에서는 OFFLINE 유지 (호스트 킥 위임)
-- [ ] T028 [US7] backend/src/services/connection.service.ts의 cleanupExpiredSessions()에서 LOBBY/ENDED 방의 모든 플레이어가 제거되면 해당 방을 store.rooms에서 삭제 (빈 방 자동 정리)
-- [ ] T029 [US7] backend/src/services/connection.service.ts의 migrateHost() 콜백에서 방 존재 여부 확인 추가: store.rooms.has(room.id)가 false이면 타이머 정리 후 조기 반환
-- [ ] T030 [US7] backend/src/handlers/connection.handler.ts에서 connection:heartbeat 이벤트 핸들러 제거, room:rejoin 이벤트 핸들러 제거
-- [ ] T031 [US7] shared/src/index.ts에서 Player 인터페이스의 lastSeenAt 필드 삭제, ClientToServerEvents에서 'connection:heartbeat'와 'room:rejoin' 이벤트 삭제
-- [ ] T032 [US7] backend/src/services/room.service.ts에서 Player 생성 시 lastSeenAt 초기화 코드 삭제 (createRoom, joinRoom 모두)
-- [ ] T033 [US7] backend/src/services/connection.service.ts에서 lastSeenAt 관련 코드 전부 삭제 (updateConnectionStatus, restoreSession 등)
+- [x] T024 [US7] backend/src/handlers/room.handler.ts에서 room:join 핸들러에 LOBBY 재접속 분기 추가: joinRoom() 실패 시 "Nickname taken" + 해당 닉네임 플레이어가 OFFLINE이면 connectionService.restoreSession() 호출
+- [x] T025 [US7] backend/src/services/connection.service.ts의 restoreSession()을 스냅샷 기반에서 room.players 실시간 기반으로 변경: room.players에서 nickname으로 기존 OFFLINE 플레이어를 찾아 id를 새 socket.id로 교체, connectionStatus를 ONLINE으로 변경, disconnectedAt을 null로 설정
+- [x] T026 [US7] backend/src/services/connection.service.ts의 restoreSession()에서 playerToRoom 인덱스 갱신 추가: 구 socket.id delete → 새 socket.id set
+- [x] T027 [US7] backend/src/services/connection.service.ts의 cleanupExpiredSessions()에서 세션 만료 시 room.players 동기 제거 로직 추가: LOBBY/ENDED 상태 방에서는 해당 OFFLINE 플레이어를 room.players에서 제거 + playerToRoom 인덱스 삭제. PLAYING 상태에서는 OFFLINE 유지 (호스트 킥 위임)
+- [x] T028 [US7] backend/src/services/connection.service.ts의 cleanupExpiredSessions()에서 LOBBY/ENDED 방의 모든 플레이어가 제거되면 해당 방을 store.rooms에서 삭제 (빈 방 자동 정리)
+- [x] T029 [US7] backend/src/services/connection.service.ts의 migrateHost() 콜백에서 방 존재 여부 확인 추가: store.rooms.has(room.id)가 false이면 타이머 정리 후 조기 반환
+- [x] T030 [US7] backend/src/handlers/connection.handler.ts에서 connection:heartbeat 이벤트 핸들러 제거, room:rejoin 이벤트 핸들러 제거
+- [x] T031 [US7] shared/src/index.ts에서 Player 인터페이스의 lastSeenAt 필드 삭제, ClientToServerEvents에서 'connection:heartbeat'와 'room:rejoin' 이벤트 삭제
+- [x] T032 [US7] backend/src/services/room.service.ts에서 Player 생성 시 lastSeenAt 초기화 코드 삭제 (createRoom, joinRoom 모두)
+- [x] T033 [US7] backend/src/services/connection.service.ts에서 lastSeenAt 관련 코드 전부 삭제 (updateConnectionStatus, restoreSession 등)
 
 **Checkpoint**: LOBBY/PLAYING 재접속 성공, 세션 만료 후 유령 플레이어 0건, dead code(heartbeat, rejoin, lastSeenAt) 완전 제거. `npm run build` 성공
 
@@ -94,9 +94,9 @@
 
 **Independent Test**: 게임 시작/종료, 랭킹 계산, 모든 거래 타입(8종) 동일 동작 확인
 
-- [ ] T034 [US4] backend/src/services/transaction.service.ts에서 processTransaction()의 switch문 각 case를 8개 private 메서드로 추출: processTransfer, processBuyAsset, processSellAsset, processPayCost, processDonate, processSalary, processWelfareReceive, processBankReceive. processTransaction()은 디스패처 역할만 수행
-- [ ] T035 [US4] backend/src/handlers/game.handler.ts에서 랭킹 계산 로직(중복 3곳)을 하나의 서비스 함수로 추출하여 backend/src/services/room.service.ts에 calculateRankings(players) 함수로 이동
-- [ ] T036 [US4] backend/src/handlers/game.handler.ts에서 중복된 랭킹 계산 코드 3곳을 모두 서비스의 calculateRankings() 호출로 교체
+- [x] T034 [US4] backend/src/services/transaction.service.ts에서 processTransaction()의 switch문 각 case를 8개 private 메서드로 추출: processTransfer, processBuyAsset, processSellAsset, processPayCost, processDonate, processSalary, processWelfareReceive, processBankReceive. processTransaction()은 디스패처 역할만 수행
+- [x] T035 [US4] backend/src/handlers/game.handler.ts에서 랭킹 계산 로직(중복 3곳)을 하나의 서비스 함수로 추출하여 backend/src/services/room.service.ts에 calculateRankings(players) 함수로 이동
+- [x] T036 [US4] backend/src/handlers/game.handler.ts에서 중복된 랭킹 계산 코드 3곳을 모두 서비스의 calculateRankings() 호출로 교체
 
 **Checkpoint**: 거래 처리의 각 타입이 독립 메서드로 분리, 랭킹 계산 중복 0건. `npm run build` 성공
 
@@ -108,11 +108,11 @@
 
 **Independent Test**: 게임 100회 생성/종료 후 힙 메모리 초기 대비 10% 미만
 
-- [ ] T037 [US3] backend/src/models/store.ts에 cleanupRoom(roomId) 메서드 구현: 해당 방의 rooms, transactions(roomTransactions 인덱스 활용), votes, gameEndVotes, cancelRequests, notifications(playerNotifications 인덱스 활용), disconnectedSessions에서 관련 데이터 일괄 삭제. playerToRoom/roomTransactions/playerNotifications 인덱스 정리. timerManager.clearByPrefix(`{roomId}:`) 호출
-- [ ] T038 [US3] backend/src/handlers/game.handler.ts에서 게임 종료(ENDED 전환) 시 timerManager.set(`{roomId}:cleanup`, () => store.cleanupRoom(roomId), ROOM_CLEANUP_DELAY_MS) 타이머 등록
-- [ ] T039 [US3] backend/src/services/connection.service.ts에서 킥 처리(kickPlayer) 후 방에 플레이어가 0명이면 store.cleanupRoom(roomId) 즉시 호출
-- [ ] T040 [US3] backend/src/handlers/connection.handler.ts에서 disconnect 처리 후 방에 온라인 플레이어가 0명이고 room.status가 LOBBY/ENDED이면, 모든 disconnectedSessions 만료 시 자동 정리되도록 Phase 4의 cleanupExpiredSessions 로직과 연동 확인
-- [ ] T041 [US3] backend/src/services/connection.service.ts의 cleanupExpiredSessions()에서 PLAYING 상태 방에서 모든 플레이어가 OFFLINE이고 세션이 전부 만료되면 store.cleanupRoom(roomId)을 호출하여 방 자동 정리
+- [x] T037 [US3] backend/src/models/store.ts에 cleanupRoom(roomId) 메서드 구현: 해당 방의 rooms, transactions(roomTransactions 인덱스 활용), votes, gameEndVotes, cancelRequests, notifications(playerNotifications 인덱스 활용), disconnectedSessions에서 관련 데이터 일괄 삭제. playerToRoom/roomTransactions/playerNotifications 인덱스 정리. timerManager.clearByPrefix(`{roomId}:`) 호출
+- [x] T038 [US3] backend/src/handlers/game.handler.ts에서 게임 종료(ENDED 전환) 시 timerManager.set(`{roomId}:cleanup`, () => store.cleanupRoom(roomId), ROOM_CLEANUP_DELAY_MS) 타이머 등록
+- [x] T039 [US3] backend/src/services/connection.service.ts에서 킥 처리(kickPlayer) 후 방에 플레이어가 0명이면 store.cleanupRoom(roomId) 즉시 호출
+- [x] T040 [US3] backend/src/handlers/connection.handler.ts에서 disconnect 처리 후 방에 온라인 플레이어가 0명이고 room.status가 LOBBY/ENDED이면, 모든 disconnectedSessions 만료 시 자동 정리되도록 Phase 4의 cleanupExpiredSessions 로직과 연동 확인
+- [x] T041 [US3] backend/src/services/connection.service.ts의 cleanupExpiredSessions()에서 PLAYING 상태 방에서 모든 플레이어가 OFFLINE이고 세션이 전부 만료되면 store.cleanupRoom(roomId)을 호출하여 방 자동 정리
 
 **Checkpoint**: 게임 종료 후 5분에 방 데이터 완전 삭제, 전원 퇴장 시 즉시 삭제, PLAYING 중 전원 오프라인+세션 만료 시 삭제. `npm run build` 성공
 
@@ -124,12 +124,12 @@
 
 **Independent Test**: 코드베이스에서 non-null assertion 0건
 
-- [ ] T042 [P] [US6] backend/src/handlers/connection.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
-- [ ] T043 [P] [US6] backend/src/handlers/game.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
-- [ ] T044 [P] [US6] backend/src/handlers/room.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
-- [ ] T045 [P] [US6] backend/src/handlers/transaction.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
-- [ ] T046 [P] [US6] backend/src/handlers/vote.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
-- [ ] T047 [P] [US6] backend/src/services/ 디렉토리의 모든 서비스 파일(connection, room, transaction, vote, notification)에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return 패턴으로 교체
+- [x] T042 [P] [US6] backend/src/handlers/connection.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
+- [x] T043 [P] [US6] backend/src/handlers/game.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
+- [x] T044 [P] [US6] backend/src/handlers/room.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
+- [x] T045 [P] [US6] backend/src/handlers/transaction.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
+- [x] T046 [P] [US6] backend/src/handlers/vote.handler.ts에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return + 에러 콜백 패턴으로 교체
+- [x] T047 [P] [US6] backend/src/services/ 디렉토리의 모든 서비스 파일(connection, room, transaction, vote, notification)에서 non-null assertion(!)을 모두 찾아 명시적 null 체크 + early return 패턴으로 교체
 
 **Checkpoint**: `grep -rn '!\.' backend/src/ --include='*.ts'` 에서 non-null assertion 0건. `npm run build` 성공
 
@@ -139,13 +139,13 @@
 
 **Purpose**: 최종 검증, 빌드 확인, 잔여 dead code 정리
 
-- [ ] T048 shared 패키지 빌드 확인: `cd shared && npm run build` 실행하여 타입 변경(lastSeenAt 삭제, 이벤트 삭제)이 컴파일 에러 없이 통과하는지 확인
-- [ ] T049 백엔드 빌드 확인: `cd backend && npm run build` 실행하여 전체 변경이 TypeScript 컴파일 에러 없이 통과하는지 확인
-- [ ] T050 매직넘버 잔여 검사: backend/src/ 디렉토리에서 60000, 120000, 300000 등 타임아웃 관련 매직넘버가 constants.ts 외에 0건인지 확인
-- [ ] T051 getRoomId 중복 검사: backend/src/ 디렉토리에서 getRoomId 로컬 정의가 helpers.ts 외에 0건인지 확인
-- [ ] T052 non-null assertion 최종 검사: backend/src/ 디렉토리에서 non-null assertion 연산자(!) 사용이 0건인지 확인 (!=, !== 제외)
-- [ ] T053 dead code 최종 검사: backend/src/에서 사용되지 않는 import, 미참조 변수, heartbeat/lastSeenAt/room:rejoin 잔재가 0건인지 확인
-- [ ] T054 프론트엔드 빌드 확인: `cd frontend && npm run build` 실행하여 shared 타입 변경이 프론트엔드 빌드에 영향을 주지 않는지 확인
+- [x] T048 shared 패키지 빌드 확인: `cd shared && npm run build` 실행하여 타입 변경(lastSeenAt 삭제, 이벤트 삭제)이 컴파일 에러 없이 통과하는지 확인
+- [x] T049 백엔드 빌드 확인: `cd backend && npm run build` 실행하여 전체 변경이 TypeScript 컴파일 에러 없이 통과하는지 확인
+- [x] T050 매직넘버 잔여 검사: backend/src/ 디렉토리에서 60000, 120000, 300000 등 타임아웃 관련 매직넘버가 constants.ts 외에 0건인지 확인
+- [x] T051 getRoomId 중복 검사: backend/src/ 디렉토리에서 getRoomId 로컬 정의가 helpers.ts 외에 0건인지 확인
+- [x] T052 non-null assertion 최종 검사: backend/src/ 디렉토리에서 non-null assertion 연산자(!) 사용이 0건인지 확인 (!=, !== 제외)
+- [x] T053 dead code 최종 검사: backend/src/에서 사용되지 않는 import, 미참조 변수, heartbeat/lastSeenAt/room:rejoin 잔재가 0건인지 확인
+- [x] T054 프론트엔드 빌드 확인: `cd frontend && npm run build` 실행하여 shared 타입 변경이 프론트엔드 빌드에 영향을 주지 않는지 확인
 
 ---
 

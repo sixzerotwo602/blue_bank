@@ -3,6 +3,7 @@ import { roomService } from '../services/room.service.js';
 import { connectionService } from '../services/connection.service.js';
 import { store } from '../models/store.js';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
+import { getRoomId } from '../utils/helpers.js';
 
 export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToClientEvents>, socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
   socket.on('room:create', (nickname, callback) => {
@@ -29,11 +30,30 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
         const restoredPlayer = connectionService.restoreSession(roomId, nickname, socket.id);
         if (restoredPlayer) {
           result = { success: true };
-          // Notify others about rejoin (optional, or just rely on sync)
           io.to(roomId).emit('player:rejoined', {
             playerId: restoredPlayer.id,
             nickname: restoredPlayer.nickname
           });
+        }
+      }
+
+      // 3. LOBBY 재접속: 닉네임 중복 + 기존 플레이어가 OFFLINE이면 세션 복원
+      if (!result.success && result.message === 'Nickname taken') {
+        const room = store.rooms.get(roomId);
+        if (room) {
+          const offlinePlayer = room.players.find(
+            p => p.nickname === nickname && p.connectionStatus === 'OFFLINE'
+          );
+          if (offlinePlayer) {
+            const restoredPlayer = connectionService.restoreSession(roomId, nickname, socket.id);
+            if (restoredPlayer) {
+              result = { success: true };
+              io.to(roomId).emit('player:rejoined', {
+                playerId: restoredPlayer.id,
+                nickname: restoredPlayer.nickname
+              });
+            }
+          }
         }
       }
 
@@ -65,14 +85,7 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
   // Task 7.2: 자산명 수정 핸들러
   socket.on('asset:rename', (assetId: string, newName: string, callback) => {
     try {
-      // 플레이어가 속한 방 찾기
-      let roomId: string | null = null;
-      for (const room of store.rooms.values()) {
-        if (room.players.some(p => p.id === socket.id)) {
-          roomId = room.id;
-          break;
-        }
-      }
+      const roomId = getRoomId(socket.id);
 
       if (!roomId) {
         return callback({ success: false, error: '방을 찾을 수 없습니다' });
