@@ -364,24 +364,16 @@ export const useGame = (roomId?: string) => {
         hasAttemptedRelogin.current = true;
         
         // Try to join/rejoin
-        socket.emit('room:join', roomId, storedNickname, (res) => {
+        socket.emit('room:join', roomId, storedNickname, (res: any) => {
             if (res.success) {
-                // If success, we are good.
-                // Could be a fresh join or a restore.
                 toast.success('접속되었습니다');
+                // 게임 진행 중이면 인게임 화면으로 자동 이동
+                if (res.room?.status === 'PLAYING' && window.location.pathname.includes('/lobby')) {
+                    setRoom(res.room);
+                    navigate(`/game/${roomId}`);
+                }
             } else {
-                // If failed (e.g. "Nickname taken"), it might be because we are already connected (nav) 
-                // or someone else took it.
-                // For "Nickname taken", we usually don't need to alert if it's just a nav check.
-                // But if we are refreshing, we want to know.
-                // Given the complexities, maybe just log or silent?
                 if (res.message !== 'Nickname taken') {
-                     // Only show error if it's NOT "Nickname taken" (which implies we might already be in)
-                     // But wait, if we are 'spectating' (refresh), we are NOT in.
-                     // If existing player is OFFLINE, we want to reclaim.
-                     // Backend room.handler now handles "Game already started" -> Restore.
-                     // But "Nickname taken" (Lobby duplicate) is still an issue if we don't fix backend.
-                     // For MVP, if game started, this works.
                      console.log('Auto-join result:', res);
                 }
             }
@@ -405,11 +397,18 @@ export const useGame = (roomId?: string) => {
 
   const joinRoom = useCallback((targetRoomId: string, nickname: string) => {
     if (!socket) return;
-    socket.emit('room:join', targetRoomId, nickname, (res) => {
+    socket.emit('room:join', targetRoomId, nickname, (res: any) => {
       if (res.success) {
         localStorage.setItem(`blue-banker-nickname-${targetRoomId}`, nickname);
-        toast.success(`${targetRoomId}번 방 입장!`);
-        navigate(`/lobby/${targetRoomId}`);
+        // room.status에 따라 적절한 페이지로 즉시 라우팅
+        if (res.room?.status === 'PLAYING') {
+          setRoom(res.room);
+          toast.success('게임에 재접속했습니다!');
+          navigate(`/game/${targetRoomId}`);
+        } else {
+          toast.success(`${targetRoomId}번 방 입장!`);
+          navigate(`/lobby/${targetRoomId}`);
+        }
       } else {
         setError(res.message || '입장 실패');
         toast.error(res.message || '입장 실패');

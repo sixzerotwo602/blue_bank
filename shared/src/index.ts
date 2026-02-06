@@ -246,7 +246,7 @@ export interface ServerToClientEvents {
 // T007: ClientToServerEvents에 새 이벤트 타입 추가
 export interface ClientToServerEvents {
   'room:create': (nickname: string, callback: (response: { roomId: string }) => void) => void;
-  'room:join': (roomId: string, nickname: string, callback: (response: { success: boolean, message?: string }) => void) => void;
+  'room:join': (roomId: string, nickname: string, callback: (response: { success: boolean, message?: string, room?: Room }) => void) => void;
   'room:get': (roomId: string, callback: (response: { room?: Room, error?: string }) => void) => void;
   'game:start': (initialCash: number) => void;
   'game:end': (roomId: string) => void;

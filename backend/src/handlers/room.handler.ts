@@ -65,8 +65,11 @@ export const registerRoomHandlers = (io: Server<ClientToServerEvents, ServerToCl
           // Broadcast to everyone in room including sender
           io.to(roomId).emit('room:sync', room);
         }
+        // 콜백에 room 포함: 프론트엔드에서 status 기반 라우팅 가능
+        callback(room ? { ...result, room } : result);
+      } else {
+        callback(result);
       }
-      callback(result);
     } catch (e: unknown) {
       console.error(e);
       callback({ success: false, message: 'Server error' });
