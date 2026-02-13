@@ -3,6 +3,8 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/sh
 import { connectionService } from '../services/connection.service.js';
 import { store } from '../models/store.js';
 import { getRoomId } from '../utils/helpers.js';
+import { validate } from '../utils/validation.js';
+import { rateLimiter } from '../utils/rate-limiter.js';
 
 /**
  * Connection Handler - Handles connection-related socket events
@@ -14,6 +16,9 @@ export const registerConnectionHandlers = (
 
   // Handle disconnect event (T016, T027, T037)
   socket.on('disconnect', () => {
+    // Rate limiter 메모리 정리
+    rateLimiter.clear(socket.id);
+
     const roomId = getRoomId(socket.id);
     if (!roomId) return;
 
@@ -43,6 +48,12 @@ export const registerConnectionHandlers = (
   // Handle player kick (T046-T047)
   socket.on('player:kick', (playerId: string, callback) => {
     try {
+      if (!rateLimiter.checkLimit(socket.id, 'GENERAL')) {
+        return callback({ success: false, message: '요청이 너무 많습니다' });
+      }
+
+      const v = validate<{ playerId: string }>('player:kick', { playerId });
+
       const roomId = getRoomId(socket.id);
       if (!roomId) {
         callback({ success: false, message: '방을 찾을 수 없습니다' });
@@ -63,7 +74,7 @@ export const registerConnectionHandlers = (
       }
 
       // Find target player
-      const targetPlayer = room.players.find(p => p.id === playerId);
+      const targetPlayer = room.players.find(p => p.id === v.playerId);
       if (!targetPlayer) {
         callback({ success: false, message: '플레이어를 찾을 수 없습니다' });
         return;
@@ -76,7 +87,7 @@ export const registerConnectionHandlers = (
       }
 
       // Kick the player
-      const kicked = connectionService.kickPlayer(io, room, playerId);
+      const kicked = connectionService.kickPlayer(io, room, v.playerId);
       if (!kicked) {
         callback({ success: false, message: '퇴장 처리에 실패했습니다' });
         return;

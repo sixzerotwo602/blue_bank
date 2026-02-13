@@ -444,6 +444,9 @@ export class TransactionService {
     const transaction = this.getTransaction(transactionId);
     if (!transaction) return { error: '거래를 찾을 수 없습니다' };
 
+    // 중복 취소 방지
+    if (transaction.status === 'CANCELLED') return { error: '이미 취소된 거래입니다' };
+
     const room = store.rooms.get(roomId);
     if (!room) return { error: '방을 찾을 수 없습니다' };
 
@@ -472,10 +475,21 @@ export class TransactionService {
     if (transaction.toId !== 'BANK' && transaction.toId !== 'FUND') {
       const toPlayer = room.players.find(p => p.id === transaction.toId);
       if (toPlayer) {
+        // 수신자 잔액 검증 — 음수 잔고 방지
+        if (toPlayer.cash < transaction.amount) {
+          // 발신자 반환 롤백
+          if (fromPlayer) fromPlayer.cash -= transaction.amount;
+          return { error: '수신자의 잔액이 부족하여 취소할 수 없습니다' };
+        }
         toPlayer.cash -= transaction.amount;
       }
     } else if (transaction.toId === 'FUND') {
-      // 복지기금으로 보낸 경우 복지기금에서 차감
+      // 복지기금 잔액 검증
+      if (room.welfareFund < transaction.amount) {
+        // 발신자 반환 롤백
+        if (fromPlayer) fromPlayer.cash -= transaction.amount;
+        return { error: '복지기금 잔액이 부족하여 취소할 수 없습니다' };
+      }
       room.welfareFund -= transaction.amount;
     }
     // BANK는 무한 자원이므로 차감 불필요

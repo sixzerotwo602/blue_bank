@@ -56,14 +56,16 @@ class NotificationService {
   }
 
   /**
-   * 모든 알림 읽음 처리
+   * 모든 알림 읽음 처리 (인덱스 기반)
    */
   markAllAsRead(playerId: string): number {
+    const notifIds = store.playerNotifications.get(playerId);
+    if (!notifIds) return 0;
     let count = 0;
-    for (const [id, notification] of store.notifications) {
-      if (notification.targetPlayerId === playerId && !notification.read) {
-        notification.read = true;
-        store.notifications.set(id, notification);
+    for (const id of notifIds) {
+      const notif = store.notifications.get(id);
+      if (notif && !notif.read) {
+        notif.read = true;
         count++;
       }
     }
@@ -71,17 +73,11 @@ class NotificationService {
   }
 
   /**
-   * 플레이어의 알림 목록 조회
+   * 플레이어의 알림 목록 조회 (인덱스 기반)
    */
   getPlayerNotifications(playerId: string): Notification[] {
-    const notifications: Notification[] = [];
-    for (const notification of store.notifications.values()) {
-      if (notification.targetPlayerId === playerId) {
-        notifications.push(notification);
-      }
-    }
-    // 최신순 정렬
-    return notifications.sort((a, b) => b.timestamp - a.timestamp);
+    return store.getPlayerNotifications(playerId)
+      .sort((a, b) => b.timestamp - a.timestamp);
   }
 
   /**

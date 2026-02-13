@@ -2,9 +2,11 @@ import { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, BankReceiveReason } from '@blue-banker/shared';
 import { voteService } from '../services/vote.service.js';
 import { store } from '../models/store.js';
-import { getRoomId } from '../utils/helpers.js';
+import { getRoomId, isRoomMember } from '../utils/helpers.js';
 import { VOTE_TIMEOUT_MS } from '../utils/constants.js';
 import { timerManager } from '../utils/timer-manager.js';
+import { validate } from '../utils/validation.js';
+import { rateLimiter } from '../utils/rate-limiter.js';
 
 export const registerVoteHandlers = (
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -13,12 +15,19 @@ export const registerVoteHandlers = (
 
   socket.on('vote:request_fund', (_amount: number) => {
     try {
+        if (!rateLimiter.checkLimit(socket.id, 'VOTE')) {
+            socket.emit('error', '요청이 너무 많습니다');
+            return;
+        }
+
         const roomId = getRoomId(socket.id);
         if (!roomId) throw new Error('방을 찾을 수 없습니다');
 
         // T015: Use full amount
         const room = store.rooms.get(roomId);
         if (!room) throw new Error('방을 찾을 수 없습니다');
+
+        if (!isRoomMember(socket.id, room)) throw new Error('방 멤버가 아닙니다');
 
         const fullAmount = room.welfareFund;
         if (fullAmount <= 0) throw new Error('복지기금이 없습니다.');
@@ -47,7 +56,26 @@ export const registerVoteHandlers = (
 
   socket.on('vote:cast', (voteId: string, approve: boolean) => {
     try {
-        const vote = voteService.castVote(voteId, socket.id, approve);
+        if (!rateLimiter.checkLimit(socket.id, 'VOTE')) {
+            socket.emit('error', '요청이 너무 많습니다');
+            return;
+        }
+
+        const v = validate<{ voteId: string; approve: boolean }>('vote:cast', { voteId, approve });
+
+        // 방 멤버십 검증 (핵심 취약점 수정)
+        const roomId = getRoomId(socket.id);
+        if (!roomId) {
+            socket.emit('error', '방에 참여하지 않았습니다');
+            return;
+        }
+        const room = store.rooms.get(roomId);
+        if (!room || !isRoomMember(socket.id, room)) {
+            socket.emit('error', '방 멤버가 아닙니다');
+            return;
+        }
+
+        const vote = voteService.castVote(v.voteId, socket.id, v.approve);
 
         // Emit update - 투표 유형에 따라 적절한 이벤트 전송
         if (vote.voteType === 'BANK_RECEIVE') {
@@ -68,9 +96,9 @@ export const registerVoteHandlers = (
                  io.to(vote.roomId).emit('vote:ended', vote);
              }
 
-             const room = store.rooms.get(vote.roomId);
-             if (room) {
-                 io.to(vote.roomId).emit('room:sync', room);
+             const voteRoom = store.rooms.get(vote.roomId);
+             if (voteRoom) {
+                 io.to(vote.roomId).emit('room:sync', voteRoom);
              }
         }
 
@@ -82,16 +110,20 @@ export const registerVoteHandlers = (
   // Task 5.2: 은행 수령 투표 요청 핸들러
   socket.on('vote:request_bank_receive', (payload: { amount: number; reason: BankReceiveReason; customReason?: string }, callback) => {
     try {
+        if (!rateLimiter.checkLimit(socket.id, 'VOTE')) {
+            return callback({ success: false, error: '요청이 너무 많습니다' });
+        }
+
+        const v = validate<{ amount: number; reason: BankReceiveReason; customReason?: string }>('vote:request_bank_receive', payload);
+
         const roomId = getRoomId(socket.id);
         if (!roomId) {
             return callback({ success: false, error: '방을 찾을 수 없습니다' });
         }
 
-        const { amount, reason, customReason } = payload;
-
-        // 금액 검증
-        if (!amount || amount <= 0) {
-            return callback({ success: false, error: '유효한 금액을 입력해주세요' });
+        const room = store.rooms.get(roomId);
+        if (!room || !isRoomMember(socket.id, room)) {
+            return callback({ success: false, error: '방 멤버가 아닙니다' });
         }
 
         // 진행 중인 투표 확인
@@ -100,7 +132,7 @@ export const registerVoteHandlers = (
             return callback({ success: false, error: '이미 투표가 진행 중입니다' });
         }
 
-        const vote = voteService.createBankReceiveVote(roomId, socket.id, amount, reason, customReason);
+        const vote = voteService.createBankReceiveVote(roomId, socket.id, v.amount, v.reason, v.customReason);
 
         // 투표 타임아웃 타이머 등록 (TimerManager)
         timerManager.set(`${roomId}:vote:${vote.id}`, () => {

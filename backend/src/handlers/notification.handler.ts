@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
 import { notificationService } from '../services/notification.service.js';
+import { validate } from '../utils/validation.js';
 
 /**
  * T029: 알림 핸들러 - mark_read, mark_all_read
@@ -12,7 +13,8 @@ export const registerNotificationHandlers = (
   // 단일 알림 읽음 처리
   socket.on('notification:mark_read', (notificationId: string, callback) => {
     try {
-      const success = notificationService.markAsRead(notificationId);
+      const v = validate<{ notificationId: string }>('notification:mark_read', { notificationId });
+      const success = notificationService.markAsRead(v.notificationId);
       if (callback) callback({ success });
     } catch (error) {
       if (callback) callback({ success: false });

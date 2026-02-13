@@ -11,6 +11,7 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN;
 
 // 개발 환경 CORS 허용 origin 목록
 const devCorsOrigins = [
@@ -36,7 +37,17 @@ app.get('/health', (req, res) => {
 // 프로덕션: 프론트엔드 정적 파일 서빙
 if (isProduction) {
   const frontendPath = path.join(__dirname, '../../frontend/dist');
-  app.use(express.static(frontendPath));
+  app.use(express.static(frontendPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.includes('/assets/') || filePath.includes('\\assets\\')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+      }
+    }
+  }));
 
   // SPA fallback: socket.io 외 모든 경로 → index.html (Express 5 문법)
   app.get('/{*path}', (req, res) => {
@@ -60,6 +71,18 @@ export const io = new Server<
       methods: ['GET', 'POST'],
     },
   }),
+  // 프로덕션: Origin 검증 (WebSocket CSWSH 방지)
+  ...(isProduction && ALLOWED_ORIGIN && {
+    allowRequest: (req, callback) => {
+      const origin = req.headers.origin;
+      if (origin && origin !== ALLOWED_ORIGIN) {
+        console.warn(`[Security] Rejected WebSocket from origin: ${origin}`);
+        callback('Origin not allowed', false);
+        return;
+      }
+      callback(null, true);
+    },
+  }),
 });
 
 import { registerRoomHandlers } from './handlers/room.handler.js';
@@ -68,15 +91,13 @@ import { registerTransactionHandlers } from './handlers/transaction.handler.js';
 import { registerVoteHandlers } from './handlers/vote.handler.js';
 import { registerConnectionHandlers } from './handlers/connection.handler.js';
 import { connectionService } from './services/connection.service.js';
-import { SESSION_CLEANUP_INTERVAL_MS } from './utils/constants.js';
+import { store } from './models/store.js';
+import { SESSION_CLEANUP_INTERVAL_MS, MAX_ROOM_AGE_MS } from './utils/constants.js';
+import { getClientIp } from './utils/helpers.js';
+import { rateLimiter } from './utils/rate-limiter.js';
 
 io.on('connection', (socket) => {
-  // Cloudflare Tunnel: cf-connecting-ip > x-forwarded-for > 직접 연결 IP
-  const headers = socket.handshake.headers;
-  const cfIp = headers['cf-connecting-ip'];
-  const forwarded = headers['x-forwarded-for'];
-  const forwardedIp = typeof forwarded === 'string' ? forwarded.split(',')[0] ?? '' : '';
-  const clientIp = (typeof cfIp === 'string' && cfIp) || forwardedIp.trim() || socket.handshake.address;
+  const clientIp = getClientIp(socket);
   console.log(`Client connected: ${socket.id} [${clientIp}]`);
 
   registerRoomHandlers(io, socket);
@@ -96,6 +117,17 @@ setInterval(() => {
   if (cleaned > 0) {
     console.log(`Cleaned up ${cleaned} expired sessions`);
   }
+
+  // 24시간 초과 방 자동 정리
+  const now = Date.now();
+  for (const [roomId, room] of store.rooms.entries()) {
+    if (now - room.createdAt > MAX_ROOM_AGE_MS) {
+      store.cleanupRoom(roomId);
+    }
+  }
+
+  // Rate limiter 만료 레코드 정리
+  rateLimiter.cleanup();
 }, SESSION_CLEANUP_INTERVAL_MS);
 
 export default app;

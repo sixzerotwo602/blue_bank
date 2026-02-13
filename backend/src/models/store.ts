@@ -14,6 +14,7 @@ class Store {
   public playerToRoom: Map<string, string> = new Map();           // playerId → roomId
   public roomTransactions: Map<string, Set<string>> = new Map();  // roomId → Set<txId>
   public playerNotifications: Map<string, Set<string>> = new Map(); // playerId → Set<notifId>
+  public roomCreatorIps: Map<string, string> = new Map(); // roomId → creatorIp
 
   constructor() {
     this.rooms = new Map();
@@ -76,6 +77,15 @@ class Store {
     return count;
   }
 
+  // IP별 방 생성 수 조회
+  countRoomsByIp(ip: string): number {
+    let count = 0;
+    for (const creatorIp of this.roomCreatorIps.values()) {
+      if (creatorIp === ip) count++;
+    }
+    return count;
+  }
+
   // 방과 관련된 모든 데이터 일괄 삭제
   cleanupRoom(roomId: string): void {
     const room = this.rooms.get(roomId);
@@ -134,6 +144,9 @@ class Store {
       }
     }
 
+    // IP 추적 정리
+    this.roomCreatorIps.delete(roomId);
+
     // 방 삭제
     this.rooms.delete(roomId);
 
@@ -153,6 +166,7 @@ class Store {
     this.playerToRoom.clear();
     this.roomTransactions.clear();
     this.playerNotifications.clear();
+    this.roomCreatorIps.clear();
     // TimerManager를 통한 모든 타이머 정리
     timerManager.clearAll();
   }
