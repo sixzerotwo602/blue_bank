@@ -36,21 +36,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
 
-      // 1. 프로덕션 환경 (도메인 체크)
-      const isProduction = hostname.includes('pages.dev') || hostname.includes('blue-banker');
+      // 1. 프로덕션 환경: Same-Origin이므로 빈 문자열 (현재 origin 자동 사용)
+      const isProduction = hostname === 'blue-bank.kr' || hostname.includes('pages.dev');
       if (isProduction) {
-        return import.meta.env.VITE_BACKEND_URL || 'https://blue-banker-backend.onrender.com';
+        return '';
       }
 
-      // 2. 개발 환경: 내부망(IP) 접속 시 우선 처리
-      // .env에 localhost가 설정되어 있어도, 모바일 접속(IP) 시에는 해당 IP를 사용해야 함
-      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        return `${protocol}//${hostname}:15645`;
-      }
-
-      // 3. 개발 환경: localhost 접속 (환경변수 우선)
+      // 2. 개발 환경: 환경변수가 설정되어 있으면 우선 사용
       if (import.meta.env.VITE_BACKEND_URL) {
         return import.meta.env.VITE_BACKEND_URL;
+      }
+
+      // 3. 개발 환경: 내부망(IP) 접속 시 해당 IP 사용
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        return `${protocol}//${hostname}:15645`;
       }
 
       return `${protocol}//${hostname}:15645`;
