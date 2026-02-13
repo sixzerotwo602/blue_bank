@@ -71,7 +71,13 @@ import { connectionService } from './services/connection.service.js';
 import { SESSION_CLEANUP_INTERVAL_MS } from './utils/constants.js';
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  // Cloudflare Tunnel: cf-connecting-ip > x-forwarded-for > 직접 연결 IP
+  const headers = socket.handshake.headers;
+  const cfIp = headers['cf-connecting-ip'];
+  const forwarded = headers['x-forwarded-for'];
+  const forwardedIp = typeof forwarded === 'string' ? forwarded.split(',')[0] ?? '' : '';
+  const clientIp = (typeof cfIp === 'string' && cfIp) || forwardedIp.trim() || socket.handshake.address;
+  console.log(`Client connected: ${socket.id} [${clientIp}]`);
 
   registerRoomHandlers(io, socket);
   registerGameHandlers(io, socket);
@@ -80,7 +86,7 @@ io.on('connection', (socket) => {
   registerConnectionHandlers(io, socket);
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log(`Client disconnected: ${socket.id} [${clientIp}]`);
   });
 });
 
