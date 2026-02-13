@@ -38,8 +38,8 @@ if (isProduction) {
   const frontendPath = path.join(__dirname, '../../frontend/dist');
   app.use(express.static(frontendPath));
 
-  // SPA fallback: socket.io 외 모든 경로 → index.html
-  app.get('*', (req, res) => {
+  // SPA fallback: socket.io 외 모든 경로 → index.html (Express 5 문법)
+  app.get('/{*path}', (req, res) => {
     if (!req.path.startsWith('/socket.io')) {
       res.sendFile(path.join(frontendPath, 'index.html'));
     }
