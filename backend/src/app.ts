@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
@@ -7,48 +9,57 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/sh
 
 dotenv.config();
 
-const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const isProduction = process.env.NODE_ENV === 'production';
 
-app.use(cors());
+// 개발 환경 CORS 허용 origin 목록
+const devCorsOrigins = [
+  "http://localhost:15485",
+  /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:15485$/,
+  /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:15485$/,
+  /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}:15485$/,
+];
+
+const app = express();
 app.use(express.json());
 
-// Health check endpoint for Cron-job.org
+// 개발 환경에서만 CORS 적용 (프로덕션은 Same-Origin)
+if (!isProduction) {
+  app.use(cors({ origin: devCorsOrigins, credentials: true }));
+}
+
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('Server is awake!');
 });
 
+// 프로덕션: 프론트엔드 정적 파일 서빙
+if (isProduction) {
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendPath));
+
+  // SPA fallback: socket.io 외 모든 경로 → index.html
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/socket.io')) {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    }
+  });
+}
+
 export const httpServer = createServer(app);
-
-// CORS origin 설정: 프로덕션과 개발 환경 분리
-const getCorsOrigins = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  if (isProduction) {
-    // 프로덕션: 허용된 도메인만
-    return [
-      "https://blue-banker.pages.dev",
-      "https://*.pages.dev"
-    ];
-  }
-
-  // 개발 환경: localhost + 내부망 IP 허용
-  return [
-    "http://localhost:15485",
-    /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:15485$/,  // 192.168.*.* 대역
-    /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:15485$/, // 10.*.*.* 대역
-    /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}:15485$/, // 172.16-31.*.* 대역
-  ];
-};
 
 export const io = new Server<
   ClientToServerEvents,
   ServerToClientEvents
 >(httpServer, {
-  cors: {
-    origin: getCorsOrigins(),
-    credentials: true,
-    methods: ['GET', 'POST'],
-  },
+  // 프로덕션: Same-Origin이므로 CORS 불필요, 개발: CORS 허용
+  ...(!isProduction && {
+    cors: {
+      origin: devCorsOrigins,
+      credentials: true,
+      methods: ['GET', 'POST'],
+    },
+  }),
 });
 
 import { registerRoomHandlers } from './handlers/room.handler.js';
@@ -82,4 +93,3 @@ setInterval(() => {
 }, SESSION_CLEANUP_INTERVAL_MS);
 
 export default app;
-

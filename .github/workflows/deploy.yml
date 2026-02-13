@@ -1,10 +1,11 @@
-name: Deploy Backend Only
+name: Deploy Full Stack
 
 on:
   push:
     branches: ['master']
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - 'shared/**'
       - '.github/workflows/**'
 
@@ -21,7 +22,7 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      # 1. 빌드 (프론트엔드 제외)
+      # 1. 빌드 (프론트엔드 포함)
       - name: Install Dependencies & Build
         run: |
           # 기존 모듈 삭제 (충돌 방지)
@@ -29,6 +30,7 @@ jobs:
           rm -rf node_modules package-lock.json
           rm -rf backend/node_modules backend/package-lock.json
           rm -rf shared/node_modules shared/package-lock.json
+          rm -rf frontend/node_modules frontend/package-lock.json
 
           echo "Installing dependencies..."
           npm install
@@ -39,9 +41,10 @@ jobs:
           echo "Building Backend..."
           cd backend && npm run build && cd ..
 
-          # ⭐️ 프론트엔드 빌드 단계 삭제됨
+          echo "Building Frontend..."
+          cd frontend && npm run build && cd ..
 
-      # 2. 운영 폴더로 배포 (백엔드만)
+      # 2. 운영 폴더로 배포 (프론트엔드 dist 포함)
       - name: Deploy to App Directory
         run: |
           echo "Deploying to ~/apps/blue_banker..."
@@ -52,7 +55,8 @@ jobs:
             --exclude 'node_modules' \
             --exclude 'backend/node_modules' \
             --exclude 'shared/node_modules' \
-            --exclude 'frontend' \
+            --exclude 'frontend/node_modules' \
+            --exclude 'frontend/src' \
             ./ ~/apps/blue_banker/
 
       # 3. 의존성 설치
