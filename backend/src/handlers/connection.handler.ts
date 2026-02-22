@@ -1,51 +1,66 @@
-import { Server, Socket } from 'socket.io';
+import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
-import { connectionService } from '../services/connection.service.js';
-import { store } from '../models/store.js';
-import { getRoomId } from '../utils/helpers.js';
+import type { GameUseCases } from '../application/game.use-cases.js';
 import { validate } from '../utils/validation.js';
 import { rateLimiter } from '../utils/rate-limiter.js';
+import { timerManager } from '../utils/timer-manager.js';
+import { HOST_MIGRATION_DELAY_MS } from '../utils/constants.js';
 
-/**
- * Connection Handler - Handles connection-related socket events
- */
 export const registerConnectionHandlers = (
   io: Server<ClientToServerEvents, ServerToClientEvents>,
-  socket: Socket<ClientToServerEvents, ServerToClientEvents>
+  socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+  gameUC: GameUseCases
 ) => {
 
-  // Handle disconnect event (T016, T027, T037)
   socket.on('disconnect', () => {
-    // Rate limiter 메모리 정리
     rateLimiter.clear(socket.id);
 
-    const roomId = getRoomId(socket.id);
+    const roomId = gameUC.getRoomId(socket.id);
     if (!roomId) return;
 
-    const room = store.rooms.get(roomId);
+    const room = gameUC.getRoom(roomId);
     if (!room) return;
 
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return;
 
-    // Update connection status to OFFLINE
-    connectionService.updateConnectionStatus(io, roomId, socket.id, 'OFFLINE');
+    gameUC.updateConnectionStatus(roomId, socket.id, 'OFFLINE');
 
-    // Save session for potential reconnection (T027)
-    connectionService.saveDisconnectedSession(player, roomId);
+    io.to(roomId).emit('connection:status', {
+      playerId: socket.id,
+      status: 'OFFLINE',
+      nickname: player.nickname
+    });
 
-    // If disconnected player was host, start migration timer (T037)
+    gameUC.saveDisconnectedSession(player, roomId);
+
     if (player.isHost) {
-      connectionService.startHostMigrationTimer(io, room, socket.id);
+      gameUC.cancelHostMigration(roomId);
+      room.pendingHostMigration = true;
+
+      io.to(roomId).emit('host:migrating', {
+        disconnectedHostId: socket.id,
+        remainingSeconds: HOST_MIGRATION_DELAY_MS / 1000
+      });
+
+      timerManager.set(`${roomId}:host-migration`, () => {
+        const newHost = gameUC.migrateHost(room);
+        if (newHost) {
+          io.to(roomId).emit('host:migrated', {
+            oldHostId: socket.id,
+            newHostId: newHost.id,
+            newHostNickname: newHost.nickname
+          });
+          io.to(roomId).emit('room:sync', room);
+        }
+      }, HOST_MIGRATION_DELAY_MS);
     }
 
-    // Sync room state
     io.to(roomId).emit('room:sync', room);
 
     console.log(`Player ${player.nickname} disconnected from room ${roomId}`);
   });
 
-  // Handle player kick (T046-T047)
   socket.on('player:kick', (playerId: string, callback) => {
     try {
       if (!rateLimiter.checkLimit(socket.id, 'GENERAL')) {
@@ -54,48 +69,54 @@ export const registerConnectionHandlers = (
 
       const v = validate<{ playerId: string }>('player:kick', { playerId });
 
-      const roomId = getRoomId(socket.id);
+      const roomId = gameUC.getRoomId(socket.id);
       if (!roomId) {
         callback({ success: false, message: '방을 찾을 수 없습니다' });
         return;
       }
 
-      const room = store.rooms.get(roomId);
+      const room = gameUC.getRoom(roomId);
       if (!room) {
         callback({ success: false, message: '방을 찾을 수 없습니다' });
         return;
       }
 
-      // Check if requester is host
       const requester = room.players.find(p => p.id === socket.id);
       if (!requester?.isHost) {
         callback({ success: false, message: '호스트만 퇴장시킬 수 있습니다' });
         return;
       }
 
-      // Find target player
       const targetPlayer = room.players.find(p => p.id === v.playerId);
       if (!targetPlayer) {
         callback({ success: false, message: '플레이어를 찾을 수 없습니다' });
         return;
       }
 
-      // Check if player is kickable (5+ minutes offline)
-      if (!connectionService.isKickable(targetPlayer)) {
+      if (!gameUC.isKickable(targetPlayer)) {
         callback({ success: false, message: '해당 플레이어는 아직 퇴장 대상이 아닙니다' });
         return;
       }
 
-      // Kick the player
-      const kicked = connectionService.kickPlayer(io, room, v.playerId);
+      const { kicked, nickname } = gameUC.kickPlayer(room, v.playerId);
       if (!kicked) {
         callback({ success: false, message: '퇴장 처리에 실패했습니다' });
         return;
       }
 
+      io.to(roomId).emit('player:kicked', {
+        playerId: v.playerId,
+        nickname: nickname || ''
+      });
+      io.to(roomId).emit('room:sync', room);
+
+      if (room.players.length === 0) {
+        gameUC.cleanupRoom(roomId);
+      }
+
       callback({ success: true });
 
-      console.log(`Player ${targetPlayer.nickname} was kicked from room ${roomId}`);
+      console.log(`Player ${nickname} was kicked from room ${roomId}`);
     } catch (error: any) {
       callback({ success: false, message: error.message || '퇴장 처리 실패' });
     }

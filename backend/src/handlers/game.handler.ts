@@ -1,15 +1,19 @@
-import { Server, Socket } from 'socket.io';
-import { store } from '../models/store.js';
-import { voteService } from '../services/vote.service.js';
-import { roomService } from '../services/room.service.js';
+import type { Server, Socket } from 'socket.io';
+import type { GameUseCases } from '../application/game.use-cases.js';
+import type { VotingUseCases } from '../application/voting.use-cases.js';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
 import { VOTE_TIMEOUT_MS, ROOM_CLEANUP_DELAY_MS } from '../utils/constants.js';
 import { timerManager } from '../utils/timer-manager.js';
-import { getRoomId, isRoomMember, isRoomHost } from '../utils/helpers.js';
+import { isRoomMember, isRoomHost } from '../utils/helpers.js';
 import { validate } from '../utils/validation.js';
 import { rateLimiter } from '../utils/rate-limiter.js';
 
-export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToClientEvents>, socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
+export const registerGameHandlers = (
+  io: Server<ClientToServerEvents, ServerToClientEvents>,
+  socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+  gameUC: GameUseCases,
+  votingUC: VotingUseCases
+) => {
   socket.on('game:start', (initialCash: number) => {
     try {
       if (!rateLimiter.checkLimit(socket.id, 'GENERAL')) {
@@ -19,26 +23,23 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
 
       const v = validate<{ initialCash: number }>('game:start', { initialCash });
 
-      const targetRoomId = getRoomId(socket.id);
+      const targetRoomId = gameUC.getRoomId(socket.id);
       if (!targetRoomId) return;
 
-      const room = store.rooms.get(targetRoomId);
+      const room = gameUC.getRoom(targetRoomId);
       if (!room) return;
 
       if (!isRoomHost(socket.id, room)) return;
       if (room.status !== 'LOBBY') return;
 
-      // Update status
       room.status = 'PLAYING';
 
-      // Apply Initial Cash
       if (v.initialCash && v.initialCash > 0) {
         room.players.forEach(p => {
           p.cash = v.initialCash;
         });
       }
 
-      // Notify all
       io.to(targetRoomId).emit('game:started');
       io.to(targetRoomId).emit('room:sync', room);
     } catch (e: any) {
@@ -48,43 +49,37 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
 
   socket.on('game:end', (_roomId: string) => {
     try {
-      // 클라이언트 제공 roomId 무시, 서버에서 조회
-      const roomId = getRoomId(socket.id);
+      const roomId = gameUC.getRoomId(socket.id);
       if (!roomId) return;
 
-      const room = store.rooms.get(roomId);
+      const room = gameUC.getRoom(roomId);
       if (!room) return;
       if (!isRoomHost(socket.id, room)) return;
 
       room.status = 'ENDED';
 
-      // 랭킹 계산
-      const rankings = roomService.calculateRankings(room.players);
+      const rankings = gameUC.calculateRankings(room.players);
 
-      // Broadcast
       io.to(roomId).emit('game:ended', { rankings });
       io.to(roomId).emit('room:sync', room);
 
-      // 게임 종료 후 방 정리 타이머 등록
       timerManager.set(`${roomId}:cleanup`, () => {
-        store.cleanupRoom(roomId);
+        gameUC.cleanupRoom(roomId);
       }, ROOM_CLEANUP_DELAY_MS);
     } catch (e: any) {
       socket.emit('error', e.message || 'Error');
     }
   });
 
-  // T056: game:request_end 이벤트 핸들러 - 게임 종료 투표 시작
   socket.on('game:request_end', (_roomId: string, callback: (res: { success: boolean; error?: string; voteId?: string }) => void) => {
     try {
-      // 클라이언트 제공 roomId 무시, 서버에서 조회
-      const roomId = getRoomId(socket.id);
+      const roomId = gameUC.getRoomId(socket.id);
       if (!roomId) {
         callback({ success: false, error: '방을 찾을 수 없습니다' });
         return;
       }
 
-      const room = store.rooms.get(roomId);
+      const room = gameUC.getRoom(roomId);
       if (!room) {
         callback({ success: false, error: '방을 찾을 수 없습니다' });
         return;
@@ -94,27 +89,26 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
         return;
       }
 
-      const vote = voteService.createGameEndVote(roomId, socket.id);
+      const vote = votingUC.startGameEndVote(room, socket.id);
 
-      // T058: game_end_vote:started 이벤트 emit
       io.to(roomId).emit('game_end_vote:started', vote);
 
-      // T054: 투표 타임아웃 (TimerManager)
       timerManager.set(`${roomId}:vote:${vote.id}`, () => {
-        const updatedVote = voteService.processGameEndVoteTimeout(vote.id);
+        const updatedRoom = gameUC.getRoom(roomId);
+        if (!updatedRoom) return;
+
+        const updatedVote = votingUC.handleGameEndVoteTimeout(vote.id, updatedRoom);
         if (updatedVote) {
           if (updatedVote.status === 'APPROVED') {
-            // 게임 종료 처리
-            room.status = 'ENDED';
-            const rankings = roomService.calculateRankings(room.players);
+            updatedRoom.status = 'ENDED';
+            const rankings = gameUC.calculateRankings(updatedRoom.players);
 
             io.to(roomId).emit('game_end_vote:ended', updatedVote);
             io.to(roomId).emit('game:ended', { rankings });
-            io.to(roomId).emit('room:sync', room);
+            io.to(roomId).emit('room:sync', updatedRoom);
 
-            // 게임 종료 후 방 정리 타이머 등록
             timerManager.set(`${roomId}:cleanup`, () => {
-              store.cleanupRoom(roomId);
+              gameUC.cleanupRoom(roomId);
             }, ROOM_CLEANUP_DELAY_MS);
           } else {
             io.to(roomId).emit('game_end_vote:ended', updatedVote);
@@ -128,7 +122,6 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
     }
   });
 
-  // T057: game_end_vote:cast 이벤트 핸들러 - 게임 종료 투표 처리
   socket.on('game_end_vote:cast', (voteId: string, approve: boolean, callback: (res: { success: boolean; error?: string }) => void) => {
     try {
       if (!rateLimiter.checkLimit(socket.id, 'VOTE')) {
@@ -137,44 +130,38 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
 
       const v = validate<{ voteId: string; approve: boolean }>('game_end_vote:cast', { voteId, approve });
 
-      // 방 멤버십 체크
-      const roomId = getRoomId(socket.id);
+      const roomId = gameUC.getRoomId(socket.id);
       if (!roomId) {
         return callback({ success: false, error: '방에 참여하지 않았습니다' });
       }
-      const room = store.rooms.get(roomId);
+      const room = gameUC.getRoom(roomId);
       if (!room || !isRoomMember(socket.id, room)) {
         return callback({ success: false, error: '방 멤버가 아닙니다' });
       }
 
-      const vote = voteService.castGameEndVote(v.voteId, socket.id, v.approve);
+      const vote = votingUC.castGameEndVote(v.voteId, socket.id, v.approve, room);
 
-      // T058: game_end_vote:updated 이벤트 emit
-      const voteRoom = store.rooms.get(vote.roomId);
-      if (voteRoom) {
-        io.to(vote.roomId).emit('game_end_vote:updated', vote);
+      io.to(vote.roomId).emit('game_end_vote:updated', vote);
 
-        // 투표 완료 확인
-        if (vote.status === 'APPROVED') {
-          // TimerManager로 타이머 정리
-          timerManager.clear(`${vote.roomId}:vote:${v.voteId}`);
+      if (vote.status === 'APPROVED') {
+        timerManager.clear(`${vote.roomId}:vote:${v.voteId}`);
 
+        const voteRoom = gameUC.getRoom(vote.roomId);
+        if (voteRoom) {
           voteRoom.status = 'ENDED';
-          const rankings = roomService.calculateRankings(voteRoom.players);
+          const rankings = gameUC.calculateRankings(voteRoom.players);
 
           io.to(vote.roomId).emit('game_end_vote:ended', vote);
           io.to(vote.roomId).emit('game:ended', { rankings });
           io.to(vote.roomId).emit('room:sync', voteRoom);
 
-          // 게임 종료 후 방 정리 타이머 등록
           timerManager.set(`${vote.roomId}:cleanup`, () => {
-            store.cleanupRoom(vote.roomId);
+            gameUC.cleanupRoom(vote.roomId);
           }, ROOM_CLEANUP_DELAY_MS);
-        } else if (vote.status === 'REJECTED') {
-          // TimerManager로 타이머 정리
-          timerManager.clear(`${vote.roomId}:vote:${v.voteId}`);
-          io.to(vote.roomId).emit('game_end_vote:ended', vote);
         }
+      } else if (vote.status === 'REJECTED') {
+        timerManager.clear(`${vote.roomId}:vote:${v.voteId}`);
+        io.to(vote.roomId).emit('game_end_vote:ended', vote);
       }
 
       callback({ success: true });
@@ -183,7 +170,6 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
     }
   });
 
-  // T047: game_end_vote:cancel 이벤트 핸들러 - 게임 종료 투표 취소
   socket.on('game_end_vote:cancel', (voteId: string, callback: (res: { success: boolean; error?: string }) => void) => {
     try {
       if (!rateLimiter.checkLimit(socket.id, 'GENERAL')) {
@@ -192,19 +178,16 @@ export const registerGameHandlers = (io: Server<ClientToServerEvents, ServerToCl
 
       const v = validate<{ voteId: string }>('game_end_vote:cancel', { voteId });
 
-      const vote = voteService.cancelGameEndVote(v.voteId, socket.id);
+      const vote = votingUC.cancelGameEndVote(v.voteId, socket.id);
 
-      // TimerManager로 타이머 정리
       timerManager.clear(`${vote.roomId}:vote:${v.voteId}`);
 
-      const room = store.rooms.get(vote.roomId);
+      const room = gameUC.getRoom(vote.roomId);
       if (room) {
-        // NEW: 취소 전용 이벤트 브로드캐스트 (클라이언트에서 모달 닫힘 + 토스트 표시)
         io.to(vote.roomId).emit('game_end_vote:cancelled', {
           voteId: vote.id,
           cancelledBy: socket.id
         });
-        // 기존 ended 이벤트도 유지 (하위 호환성)
         io.to(vote.roomId).emit('game_end_vote:ended', vote);
       }
 

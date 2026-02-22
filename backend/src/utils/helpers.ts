@@ -1,11 +1,5 @@
-import { store } from '../models/store.js';
 import type { Socket } from 'socket.io';
 import type { Room } from '@blue-banker/shared';
-
-// getRoomId: 플레이어 ID로 방 ID를 조회 (인덱스 기반 O(1))
-export function getRoomId(playerId: string): string | null {
-  return store.playerToRoom.get(playerId) ?? null;
-}
 
 // formatManwon: 금액을 만원 단위로 변환
 export function formatManwon(amount: number): string {

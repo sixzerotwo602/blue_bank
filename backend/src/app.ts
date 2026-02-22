@@ -90,8 +90,8 @@ import { registerGameHandlers } from './handlers/game.handler.js';
 import { registerTransactionHandlers } from './handlers/transaction.handler.js';
 import { registerVoteHandlers } from './handlers/vote.handler.js';
 import { registerConnectionHandlers } from './handlers/connection.handler.js';
-import { connectionService } from './services/connection.service.js';
-import { store } from './models/store.js';
+import { registerNotificationHandlers } from './handlers/notification.handler.js';
+import { notificationUseCases, votingUseCases, transactionUseCases, gameUseCases } from './application/container.js';
 import { SESSION_CLEANUP_INTERVAL_MS, MAX_ROOM_AGE_MS } from './utils/constants.js';
 import { getClientIp } from './utils/helpers.js';
 import { rateLimiter } from './utils/rate-limiter.js';
@@ -100,31 +100,27 @@ io.on('connection', (socket) => {
   const clientIp = getClientIp(socket);
   console.log(`Client connected: ${socket.id} [${clientIp}]`);
 
-  registerRoomHandlers(io, socket);
-  registerGameHandlers(io, socket);
-  registerTransactionHandlers(io, socket);
-  registerVoteHandlers(io, socket);
-  registerConnectionHandlers(io, socket);
+  registerRoomHandlers(io, socket, gameUseCases);
+  registerGameHandlers(io, socket, gameUseCases, votingUseCases);
+  registerTransactionHandlers(io, socket, gameUseCases, transactionUseCases, notificationUseCases);
+  registerVoteHandlers(io, socket, gameUseCases, votingUseCases);
+  registerConnectionHandlers(io, socket, gameUseCases);
+  registerNotificationHandlers(io, socket, notificationUseCases);
 
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id} [${clientIp}]`);
   });
 });
 
-// Session cleanup timer (T029) - runs every minute
+// 세션 정리 타이머
 setInterval(() => {
-  const cleaned = connectionService.cleanupExpiredSessions();
+  const cleaned = gameUseCases.cleanupExpiredSessions();
   if (cleaned > 0) {
     console.log(`Cleaned up ${cleaned} expired sessions`);
   }
 
   // 24시간 초과 방 자동 정리
-  const now = Date.now();
-  for (const [roomId, room] of store.rooms.entries()) {
-    if (now - room.createdAt > MAX_ROOM_AGE_MS) {
-      store.cleanupRoom(roomId);
-    }
-  }
+  gameUseCases.cleanupExpiredRooms(MAX_ROOM_AGE_MS);
 
   // Rate limiter 만료 레코드 정리
   rateLimiter.cleanup();

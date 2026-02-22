@@ -1,20 +1,23 @@
-import { Server, Socket } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents, TransactionType, NotificationType } from '@blue-banker/shared';
-import { transactionService } from '../services/transaction.service.js';
-import { notificationService } from '../services/notification.service.js';
-import { store } from '../models/store.js';
-import { getRoomId, formatManwon, isRoomMember } from '../utils/helpers.js';
+import type { Server, Socket } from 'socket.io';
+import type { ClientToServerEvents, ServerToClientEvents, TransactionType } from '@blue-banker/shared';
+import type { GameUseCases } from '../application/game.use-cases.js';
+import type { TransactionUseCases } from '../application/transaction.use-cases.js';
+import type { NotificationUseCases } from '../application/notification.use-cases.js';
+import { formatManwon, isRoomMember } from '../utils/helpers.js';
 import { CANCEL_REQUEST_TIMEOUT_MS } from '../utils/constants.js';
 import { timerManager } from '../utils/timer-manager.js';
 import { validate } from '../utils/validation.js';
 import { rateLimiter } from '../utils/rate-limiter.js';
 
+
 export const registerTransactionHandlers = (
   io: Server<ClientToServerEvents, ServerToClientEvents>,
-  socket: Socket<ClientToServerEvents, ServerToClientEvents>
+  socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+  gameUC: GameUseCases,
+  transactionUC: TransactionUseCases,
+  notificationUC: NotificationUseCases
 ) => {
 
-  // Task 4.2: bundleSell 옵션 추가
   socket.on('tx:request', (payload: { type: TransactionType; amount: number; toId?: string; assetType?: 'LAND' | 'BUILDING'; buildingType?: 'HOTEL' | 'BUILDING' | 'VILLA'; reason?: string; bundleSell?: boolean }, callback?: (response: { success: boolean; txId?: string; error?: string }) => void) => {
     try {
         if (!rateLimiter.checkLimit(socket.id, 'TRANSACTION')) {
@@ -24,12 +27,12 @@ export const registerTransactionHandlers = (
 
         const v = validate<typeof payload>('tx:request', payload);
 
-        const roomId = getRoomId(socket.id);
+        const roomId = gameUC.getRoomId(socket.id);
         if (!roomId) {
             throw new Error('방을 찾을 수 없습니다');
         }
 
-        const room = store.rooms.get(roomId);
+        const room = gameUC.getRoom(roomId);
         if (!room) {
             throw new Error('방을 찾을 수 없습니다');
         }
@@ -41,20 +44,15 @@ export const registerTransactionHandlers = (
         const requester = room.players.find(p => p.id === socket.id);
         const requesterName = requester?.nickname || '알 수 없음';
 
-        const transaction = transactionService.processTransaction(roomId, socket.id, v);
+        const transaction = transactionUC.process(room, socket.id, v);
 
-        // Broadcast success
         io.to(roomId).emit('tx:processed', transaction);
-
-        // Sync room state
         io.to(roomId).emit('room:sync', room);
 
-        // 거래 타입별 알림 발송
         switch (v.type) {
             case 'TRANSFER': {
-                // 수금자에게 알림 발송
                 if (v.toId && v.toId !== socket.id) {
-                    const notification = notificationService.createNotification(
+                    const notification = notificationUC.create(
                         'TRANSFER_RECEIVED',
                         `${requesterName}님이 ${formatManwon(transaction.amount)}을 보냈습니다`,
                         v.toId,
@@ -77,7 +75,7 @@ export const registerTransactionHandlers = (
                     OTHER: '기타'
                 };
                 const reasonLabel = reasonLabels[v.reason || ''] || '은행 지급';
-                const notification = notificationService.createNotification(
+                const notification = notificationUC.create(
                     'BANK_RECEIVED',
                     `${reasonLabel} ${formatManwon(transaction.amount)}을 수령했습니다`,
                     socket.id,
@@ -91,7 +89,7 @@ export const registerTransactionHandlers = (
             }
 
             case 'SELL_ASSET': {
-                const notification = notificationService.createNotification(
+                const notification = notificationUC.create(
                     'BANK_RECEIVED',
                     `자산 매각으로 ${formatManwon(transaction.amount)}을 받았습니다`,
                     socket.id,
@@ -108,7 +106,7 @@ export const registerTransactionHandlers = (
                 const assetTypeLabel = v.assetType === 'LAND' ? '토지' :
                     (v.buildingType === 'HOTEL' ? '호텔' :
                      v.buildingType === 'VILLA' ? '별장' : '빌딩');
-                const notification = notificationService.createNotification(
+                const notification = notificationUC.create(
                     'BANK_RECEIVED',
                     `${assetTypeLabel} ${formatManwon(transaction.amount)} 매입 완료`,
                     socket.id,
@@ -122,7 +120,7 @@ export const registerTransactionHandlers = (
             }
 
             case 'DONATE': {
-                const notification = notificationService.createNotification(
+                const notification = notificationUC.create(
                     'BANK_RECEIVED',
                     `복지기금에 ${formatManwon(transaction.amount)} 기부 완료`,
                     socket.id,
@@ -136,7 +134,7 @@ export const registerTransactionHandlers = (
             }
 
             case 'PAY_COST': {
-                const notification = notificationService.createNotification(
+                const notification = notificationUC.create(
                     'BANK_RECEIVED',
                     `은행에 ${formatManwon(transaction.amount)} 납부 완료`,
                     socket.id,
@@ -150,11 +148,9 @@ export const registerTransactionHandlers = (
             }
         }
 
-        // Ack
         if (callback) callback({ success: true, txId: transaction.id });
 
     } catch (error: any) {
-        // Ack error if callback provided, else emit global error
         if (callback) {
             callback({ success: false, error: error.message });
         } else {
@@ -163,17 +159,15 @@ export const registerTransactionHandlers = (
     }
   });
 
-  // T022: 거래 내역 조회 핸들러
   socket.on('transaction:get_history', (callback) => {
     try {
-      const transactions = store.getPlayerTransactions(socket.id);
+      const transactions = transactionUC.getPlayerTransactions(socket.id);
       callback(transactions);
     } catch (error: any) {
       callback([]);
     }
   });
 
-  // Task 6.2: 거래 취소 요청 핸들러
   socket.on('tx:request_cancel', (transactionId: string, callback) => {
     try {
       if (!rateLimiter.checkLimit(socket.id, 'TRANSACTION')) {
@@ -182,39 +176,37 @@ export const registerTransactionHandlers = (
 
       const v = validate<{ transactionId: string }>('tx:request_cancel', { transactionId });
 
-      const roomId = getRoomId(socket.id);
+      const roomId = gameUC.getRoomId(socket.id);
       if (!roomId) {
         return callback({ success: false, error: '방을 찾을 수 없습니다' });
       }
 
-      const result = transactionService.requestCancelTransaction(roomId, v.transactionId, socket.id);
+      const room = gameUC.getRoom(roomId);
+      if (!room) {
+        return callback({ success: false, error: '방을 찾을 수 없습니다' });
+      }
+
+      const result = transactionUC.requestCancel(room, v.transactionId, socket.id);
 
       if ('error' in result) {
         return callback({ success: false, error: result.error });
       }
 
-      // 플레이어 간 거래인 경우 상대방에게 알림
       if (result.targetId !== 'BANK' && result.targetId !== 'FUND') {
         io.to(result.targetId).emit('tx:cancel_requested', result);
 
-        // 거래 취소 요청 타임아웃 (TimerManager)
         timerManager.set(`${roomId}:cancel:${result.id}`, () => {
-          const request = store.cancelRequests.get(result.id);
-          if (request && request.status === 'PENDING') {
-            request.status = 'EXPIRED';
-            io.to(result.requesterId).emit('tx:cancel_responded', request);
+          const expired = transactionUC.expireCancelRequest(result.id);
+          if (expired) {
+            io.to(result.requesterId).emit('tx:cancel_responded', expired);
           }
         }, CANCEL_REQUEST_TIMEOUT_MS);
       } else {
-        // 은행/복지기금 거래는 즉시 취소 완료
-        const transaction = transactionService.getTransaction(v.transactionId);
+        const transaction = transactionUC.getTransaction(v.transactionId);
         if (transaction) {
           io.to(roomId).emit('tx:cancelled', transaction);
         }
-        const room = store.rooms.get(roomId);
-        if (room) {
-          io.to(roomId).emit('room:sync', room);
-        }
+        io.to(roomId).emit('room:sync', room);
       }
 
       callback({ success: true, requestId: result.id });
@@ -224,7 +216,6 @@ export const registerTransactionHandlers = (
     }
   });
 
-  // Task 6.2: 거래 취소 응답 핸들러
   socket.on('tx:respond_cancel', (requestId: string, approve: boolean, callback) => {
     try {
       if (!rateLimiter.checkLimit(socket.id, 'TRANSACTION')) {
@@ -233,30 +224,30 @@ export const registerTransactionHandlers = (
 
       const v = validate<{ requestId: string; approve: boolean }>('tx:respond_cancel', { requestId, approve });
 
-      const roomId = getRoomId(socket.id);
+      const roomId = gameUC.getRoomId(socket.id);
       if (!roomId) {
         return callback({ success: false, error: '방을 찾을 수 없습니다' });
       }
 
-      const result = transactionService.respondCancelRequest(roomId, v.requestId, socket.id, v.approve);
+      const room = gameUC.getRoom(roomId);
+      if (!room) {
+        return callback({ success: false, error: '방을 찾을 수 없습니다' });
+      }
+
+      const result = transactionUC.respondCancel(room, v.requestId, socket.id, v.approve);
 
       if ('error' in result) {
         return callback({ success: false, error: result.error });
       }
 
-      // 요청자에게 결과 알림
       io.to(result.requesterId).emit('tx:cancel_responded', result);
 
-      // 승인된 경우 방 전체에 알림 및 동기화
       if (result.status === 'APPROVED') {
-        const transaction = transactionService.getTransaction(result.transactionId);
+        const transaction = transactionUC.getTransaction(result.transactionId);
         if (transaction) {
           io.to(roomId).emit('tx:cancelled', transaction);
         }
-        const room = store.rooms.get(roomId);
-        if (room) {
-          io.to(roomId).emit('room:sync', room);
-        }
+        io.to(roomId).emit('room:sync', room);
       }
 
       callback({ success: true });
