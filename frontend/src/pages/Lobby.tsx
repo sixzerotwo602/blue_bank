@@ -1,9 +1,9 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useGame } from '../hooks/useGame';
-import { useSocket } from '../hooks/useSocket'; // Still need useSocket for socket.id check (or expose myId from useGame)
+import { useSocket } from '../hooks/useSocket';
 import type { Player } from '@blue-banker/shared';
-import { ConnectionStatus } from '../components/ConnectionStatus';
+import { LobbyTemplate, BaseButton, StatusDot, TextInput } from '../ui';
 import { MAX_AMOUNT } from '../utils/constants';
 import toast from 'react-hot-toast';
 
@@ -34,7 +34,7 @@ export const Lobby: React.FC = () => {
   const amIHost = room.hostId === socket?.id;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-6">
+    <LobbyTemplate>
       <div className="max-w-2xl mx-auto">
         <header className="mb-8 text-center">
             <h2 className="text-xl text-slate-400">대기실</h2>
@@ -49,7 +49,7 @@ export const Lobby: React.FC = () => {
                     <li key={p.id} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg">
                         <span className="font-medium flex items-center gap-2">
                             {/* Connection Status Indicator (T021) */}
-                            <ConnectionStatus status={p.connectionStatus || 'ONLINE'} />
+                            <StatusDot status={p.connectionStatus || 'ONLINE'} />
                             {p.nickname}
                             {p.isHost && <span className="bg-yellow-500/20 text-yellow-300 text-xs px-2 py-0.5 rounded">HOST</span>}
                             {p.id === socket?.id && <span className="bg-blue-500/20 text-blue-300 text-xs px-2 py-0.5 rounded">ME</span>}
@@ -64,30 +64,34 @@ export const Lobby: React.FC = () => {
 
         {amIHost ? (
             <div className="space-y-3">
-                <button
+                <BaseButton
                   onClick={() => startGame(2930000)}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-xl transition-all active:scale-95"
+                  fullWidth
+                  size="lg"
+                  className="shadow-xl"
                 >
                     3-4인 시작 (293만원)
-                </button>
-                <button
+                </BaseButton>
+                <BaseButton
                   onClick={() => startGame(5860000)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-xl transition-all active:scale-95"
+                  fullWidth
+                  size="lg"
+                  className="bg-indigo-600 hover:bg-indigo-500 shadow-xl"
                 >
                     2인 시작 (586만원)
-                </button>
+                </BaseButton>
                 <div className="relative border-t border-slate-700 pt-3 mt-3">
                     <p className="text-sm text-slate-400 mb-2">또는 직접 입력 (최대 100조원)</p>
                     <div className="flex gap-2">
-                        <input
+                        <TextInput
                             type="text"
                             inputMode="numeric"
                             value={customAmount}
                             onChange={(e) => setCustomAmount(formatInput(e.target.value))}
                             placeholder="금액(원)"
-                            className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white w-full focus:outline-none focus:border-blue-500 text-right"
+                            className="w-full text-right"
                         />
-                        <button
+                        <BaseButton
                             onClick={() => {
                                 const val = parseInt(customAmount.replace(/[^0-9]/g, ''), 10);
                                 if (!Number.isFinite(val) || val <= 0) {
@@ -96,10 +100,10 @@ export const Lobby: React.FC = () => {
                                 }
                                 startGame(val);
                             }}
-                            className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-bold text-white whitespace-nowrap shadow-lg transition-all active:scale-95"
+                            className="whitespace-nowrap shadow-lg"
                         >
                             시작
-                        </button>
+                        </BaseButton>
                     </div>
                 </div>
             </div>
@@ -109,6 +113,6 @@ export const Lobby: React.FC = () => {
             </div>
         )}
       </div>
-    </div>
+    </LobbyTemplate>
   );
 };

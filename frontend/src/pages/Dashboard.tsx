@@ -2,17 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useGame } from '../hooks/useGame';
 import { useSocket } from '../hooks/useSocket';
-import { MoneyDisplay } from '../components/MoneyDisplay';
-import { TransactionModal } from '../components/TransactionModal';
-import { TransactionHistory } from '../components/TransactionHistory';
+import { DashboardTemplate, QuickActionGrid, MoneyDisplay } from '../ui';
+import { TransactionModal, TransactionHistory, ConfirmModal } from '../features/transaction';
+import { RankingList } from '../features/ranking';
+import { GameEndVotePopup, BankReceiveVotePopup, WelfareFundVotePopup } from '../features/vote';
 import { BankReceiveModal } from '../components/BankReceiveModal';
 import { SellAssetModal } from '../components/SellAssetModal';
-import { GameEndVotePopup } from '../components/GameEndVotePopup';
-import { BankReceiveVotePopup } from '../components/BankReceiveVotePopup';
 import { CancelRequestPopup } from '../components/CancelRequestPopup';
-import { WelfareFundVotePopup } from '../components/WelfareFundVotePopup';
-import { RankingList } from '../components/RankingList';
-import { ConfirmModal } from '../components/ConfirmModal';
 // ConnectionStatus and KickPlayerButton are now used in RankingList
 import type { TransactionType, Transaction } from '@blue-banker/shared';
 
@@ -24,14 +20,14 @@ export const Dashboard: React.FC = () => {
   const { socket } = useSocket();
   const [modalOpen, setModalOpen] = useState(false);
   const [txType, setTxType] = useState<TransactionType>('TRANSFER');
-  
+
   // T026: 거래 내역 모달 상태
   const [historyOpen, setHistoryOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  
+
   // T043: 은행 수령 모달 상태
   const [bankReceiveOpen, setBankReceiveOpen] = useState(false);
-  
+
   // T052: 자산 매각 모달 상태
   const [sellAssetOpen, setSellAssetOpen] = useState(false);
 
@@ -78,7 +74,7 @@ export const Dashboard: React.FC = () => {
 
   const me = room.players.find(p => p.id === socket?.id);
   const isHost = me?.isHost;
-  
+
   const openModal = (type: TransactionType) => {
       setTxType(type);
       setModalOpen(true);
@@ -125,7 +121,7 @@ export const Dashboard: React.FC = () => {
   const handleKickPlayer = (playerId: string) => {
       const player = room.players.find(p => p.id === playerId);
       if (!player) return;
-      
+
       setConfirmState({
           isOpen: true,
           title: '플레이어 강제 퇴장',
@@ -139,9 +135,9 @@ export const Dashboard: React.FC = () => {
 
   const handleGoHome = () => {
       // Disconnect socket logic handled inside useSocket or manual simple redirect
-      window.location.href = '/'; 
+      window.location.href = '/';
   };
-  
+
   // T026: 거래 내역 조회 핸들러
   const handleOpenHistory = async () => {
       const history = await getTransactionHistory();
@@ -150,7 +146,7 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-24">
+    <DashboardTemplate>
        <nav className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-[1000]">
           <div className="font-bold text-lg bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Blue Bank</div>
           <div className="bg-slate-800 px-3 py-1 rounded-full text-xs font-mono text-slate-400">#{roomId}</div>
@@ -173,37 +169,15 @@ export const Dashboard: React.FC = () => {
           </section>
 
           {/* Quick Actions */}
-          <section className="grid grid-cols-2 gap-3">
-             <button 
-                onClick={() => openModal('TRANSFER')}
-                className="bg-blue-600 hover:bg-blue-500 p-4 rounded-2xl font-bold shadow-lg shadow-blue-900/20 active:bg-blue-700 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 h-32"
-             >
-                <div className="text-2xl">💸</div>
-                <div className="text-blue-100">송금하기</div>
-             </button>
-             <button
-                onClick={() => openModal('BUY_ASSET')}
-                className="bg-emerald-600 hover:bg-emerald-500 p-4 rounded-2xl font-bold shadow-lg shadow-emerald-900/20 active:bg-emerald-700 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 h-32"
-             >
-                <div className="text-2xl">🏠</div>
-                <div className="text-emerald-100">토지/건물 매입</div>
-             </button>
-             <button 
-                onClick={() => openModal('DONATE')}
-                className="bg-purple-600 hover:bg-purple-500 p-4 rounded-2xl font-bold shadow-lg shadow-purple-900/20 active:bg-purple-700 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 h-24"
-             >
-                <div className="text-lg">🤝</div>
-                <div className="text-sm text-purple-100">복지기금 기부</div>
-             </button>
-             <button 
-                onClick={handleSalary}
-                className="bg-slate-700 hover:bg-slate-600 p-4 rounded-2xl font-bold shadow-lg active:bg-slate-800 transition-all active:scale-95 border border-slate-600 flex flex-col items-center justify-center gap-1 h-24"
-             >
-                <div className="text-lg">💵</div>
-                <div className="text-sm text-slate-200">월급 받기</div>
-             </button>
-          </section>
-          
+          <QuickActionGrid
+            actions={[
+              { key: 'transfer', icon: '💸', label: '송금하기', onClick: () => openModal('TRANSFER'), className: '!h-32 bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20' },
+              { key: 'buy', icon: '🏠', label: '토지/건물 매입', onClick: () => openModal('BUY_ASSET'), className: '!h-32 bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-900/20' },
+              { key: 'donate', icon: '🤝', label: '복지기금 기부', onClick: () => openModal('DONATE'), className: 'bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-900/20' },
+              { key: 'salary', icon: '💵', label: '월급 받기', onClick: handleSalary, className: 'bg-slate-700 hover:bg-slate-600 border border-slate-600 shadow-lg' },
+            ]}
+          />
+
           {/* T026: 거래 내역 버튼 */}
           <button
              onClick={handleOpenHistory}
@@ -212,7 +186,7 @@ export const Dashboard: React.FC = () => {
              <span>📋</span>
              <span>거래 내역 보기</span>
           </button>
-          
+
           {/* T012: 은행 수령(모든 플레이어) 및 자산 매각 버튼 */}
           <div className="grid grid-cols-2 gap-2">
              <button
@@ -242,9 +216,9 @@ export const Dashboard: React.FC = () => {
                       </div>
                   </div>
               </div>
-              <button 
+              <button
                 className="text-xs bg-purple-500/10 text-purple-300 px-3 py-2 rounded-lg hover:bg-purple-500/20 transition-colors"
-                onClick={handleRequestFund} 
+                onClick={handleRequestFund}
               >
                   수령 요청
               </button>
@@ -292,8 +266,8 @@ export const Dashboard: React.FC = () => {
          initialType={txType}
          currentUserId={socket?.id}
        />
-       
-       <ConfirmModal 
+
+       <ConfirmModal
          isOpen={confirmState.isOpen}
          title={confirmState.title}
          message={confirmState.message}
@@ -319,7 +293,7 @@ export const Dashboard: React.FC = () => {
           players={room.players}
           onRequestCancel={requestCancelTransaction}
         />
-        
+
         {/* Task 5.3: 은행 수령 모달 - 투표 시스템으로 전환 */}
         <BankReceiveModal
           isOpen={bankReceiveOpen}
@@ -328,7 +302,7 @@ export const Dashboard: React.FC = () => {
           currentUserId={socket?.id}
           currentUserNickname={me?.nickname}
         />
-        
+
         {/* T052: 자산 매각 모달 */}
         <SellAssetModal
           isOpen={sellAssetOpen}
@@ -336,7 +310,7 @@ export const Dashboard: React.FC = () => {
           onSubmit={sellAsset}
           assets={me?.assets || []}
         />
-        
+
         {/* T063: 게임 종료 투표 팝업 - T049: 취소 버튼 추가 */}
         {gameEndVote && room && (
           <GameEndVotePopup
@@ -370,6 +344,6 @@ export const Dashboard: React.FC = () => {
 
        {/* Settlement Overlay */}
        <SettlementView rankings={rankings} onGoHome={handleGoHome} />
-    </div>
+    </DashboardTemplate>
   );
 };
