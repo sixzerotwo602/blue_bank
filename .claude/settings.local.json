@@ -14,7 +14,8 @@
       "Bash(gh label:*)",
       "Bash(gh issue create:*)",
       "Bash(gh issue close 22 --comment \"$\\(cat <<''EOF''\n## 이슈 완료 보고\n\n### 해결 상태: ✅ 완료\n\n### 문제 요약\nCloudflare Pages 배포 빌드에서 `frontend/src/components/RankingList.tsx`의 미사용 변수 `toggleFormat`이 TypeScript `TS6133` 에러를 발생시켜 빌드가 실패함.\n\n### 수정 내용\n- **파일**: `frontend/src/components/RankingList.tsx` \\(88번째 줄\\)\n- **변경**: `useMoneyFormat\\(\\)` 훅의 destructuring에서 미사용 변수 `toggleFormat` 제거\n- **커밋**: [`46257e4`]\\(https://github.com/sixzerotwo602/blue_bank/commit/46257e4a18091d3fd281b82a5c572af0a29b6a12\\)\n\n### 변경 전후 비교\n\n| 항목 | 변경 전 | 변경 후 |\n|------|---------|---------|\n| 코드 | `const { useManwon, toggleFormat } = useMoneyFormat\\(\\);` | `const { useManwon } = useMoneyFormat\\(\\);` |\n| 빌드 | TS6133 에러로 실패 | 정상 통과 |\n\n### 검증 결과\n- `tsc -b` 로컬 빌드 성공 확인\n- 기능적 변경 없음 \\(미사용 변수 제거만 수행\\)\n- 기존 동작에 영향 없음\n\n### 영향 범위\n- 변경 파일 1개, 변경 라인 1줄\n- 런타임 동작 변경 없음\nEOF\n\\)\")",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm audit:*)"
     ]
   }
 }
