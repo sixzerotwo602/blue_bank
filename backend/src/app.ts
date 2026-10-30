@@ -7,7 +7,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import type { ClientToServerEvents, ServerToClientEvents } from '@blue-banker/shared';
 
-dotenv.config({ path: process.env.DOTENV_CONFIG_PATH });
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || '.env' });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
