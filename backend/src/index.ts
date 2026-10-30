@@ -1,6 +1,6 @@
 import { httpServer } from './app.js'; // Use .js extension for ESM
 
-const PORT = process.env.PORT || 15645;
+const PORT = Number(process.env.PORT || 15645);
 
 // Graceful shutdown 처리
 const shutdown = () => {
@@ -21,6 +21,6 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '127.0.0.1', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
