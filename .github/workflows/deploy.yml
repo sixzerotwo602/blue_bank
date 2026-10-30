@@ -71,9 +71,7 @@ jobs:
         env:
           DOTENV_CONTENT: ${{ secrets.DOTENV }}
         run: |
-          echo "$DOTENV_CONTENT" > ~/apps/blue_banker/backend/.env
-          chgrp blue-app ~/apps/blue_banker/backend/.env
-          chmod 640 ~/apps/blue_banker/backend/.env
+          printf '%s' "$DOTENV_CONTENT" | sudo -n -u blue-app /usr/local/libexec/blue-banker-pm2 publish-env
 
       # 5. PM2 재시작
       - name: Reload PM2
